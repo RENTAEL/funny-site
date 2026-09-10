@@ -8,6 +8,10 @@ import { twMerge } from 'tailwind-merge';
 import PortalBox from "../components/PortalBox";
 import Modal from "../components/Modal";
 import DodgeBuy from "../components/DodgeBuy";
+import Clippy from "../components/Clippy";
+import ExitLoop from "../components/ExitLoop";
+import Faq from "../components/Faq";
+import Testimonials from "../components/Testimonials";
 import AdminPanel from "../components/AdminPanel";
 // twMerge-import-replaced from 'tailwind-merge';
 
@@ -28,6 +32,7 @@ const TESTIMONIALS = [
   { text: "this website dodged my cursor. i'm in love.", author: "xX_shadow_Xx" },
   { text: "why does this exist", author: "my therapist" },
 ];
+const HERO_SUBS = ["the app that does the opposite of what you want. enterprise ready.", "now with 12% fewer features. somehow worse.", "still enterprise. still ready. still opposite."];
 const BOOT_LINES = ["loading chaos... \u2713", "downloading more RAM... \u2713", "judging you... \u2713", "welcome."];
 const HYDRA_MSGS = ["we use cookies. you can't stop us.", "how dare you", "rude but ok", "wow. again?", "the cookies are multiplying", "this is your fault", "fine. have another one", "ok that's 8. we're done here."];
 const BASE_CLAUSES = [
@@ -46,7 +51,8 @@ const BASE_CLAUSES = [
 const EMOJI_POOL = ["\u{1F921}", "\u{1F436}", "\u{1F34C}", "\u{1F680}", "\u{1F47B}", "\u{1F34D}", "\u{1F525}", "\u{1F480}", "\u{1F984}", "\u{1F412}"];
 const KONAMI = ["ArrowUp", "ArrowUp", "ArrowDown", "ArrowDown", "ArrowLeft", "ArrowRight", "ArrowLeft", "ArrowRight", "b", "a"];
 
-type ChatMsg = { me: boolean; text: string; k: string };
+type ChatMsg = { me: boolean; text: string; k: string; name?: string; at?: number };
+type RoomMsg = { id: string; name: string; text: string; at: number };
 let chatK = 1;
 const kid = () => "k" + (chatK++);
 // CHANGE THIS PHRASE TO WHATEVER YOU WANT THE SECRET ADMIN PHRASE TO BE
@@ -80,12 +86,13 @@ export default function OppositeExe() {
   const [scanning, setScanning] = useState(false);
   const [scanProgress, setScanProgress] = useState(0);
   const [scanDone, setScanDone] = useState(false);
+  const [virusMsg, setVirusMsg] = useState("warming up the scanner...");
   const [fixMsg, setFixMsg] = useState('');
   const [pw, setPw] = useState('');
   const [pwMsg, setPwMsg] = useState('');
   const [bsod, setBsod] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
-  const [chatMsgs, setChatMsgs] = useState<ChatMsg[]>([{ me: false, text: "hi welcome to 24/7 support. what's broken (besides everything)?", k: "k0" }]);
+  const [chatMsgs, setChatMsgs] = useState<ChatMsg[]>([{ me: false, text: "hi welcome to group therapy. no refunds. what's broken (besides everything)?", k: "k0" }]);
   const [chatInput, setChatInput] = useState('');
   const [chatDead, setChatDead] = useState(false);
   const [honestMsg, setHonestMsg] = useState('');
@@ -108,6 +115,35 @@ export default function OppositeExe() {
   const [quake, setQuake] = useState(false);
   const [lightsOut, setLightsOut] = useState(false);
   const [pacifist, setPacifist] = useState(false);
+  const [indepCursor, setIndepCursor] = useState(false);
+  const [cursor2, setCursor2] = useState({ x: -100, y: -100 });
+  const [gremlin, setGremlin] = useState(false);
+  const [tabPanic, setTabPanic] = useState(false);
+  const tabPanicRef = useRef(false);
+  const [slowNet, setSlowNet] = useState(false);
+  const [popups, setPopups] = useState<number[]>([]);
+  const popupN = useRef(0);
+  const popupSpawned = useRef(0);
+  const [emojiRain, setEmojiRain] = useState(false);
+  const [rainDrops, setRainDrops] = useState<number[]>([]);
+  const [clippyOpen, setClippyOpen] = useState(false);
+  const [autopilot, setAutopilot] = useState(false);
+  const [autoPos, setAutoPos] = useState({ x: -100, y: -100 });
+  const [shakespeare, setShakespeare] = useState(false);
+  const [judgment, setJudgment] = useState(false);
+  const [judgmentText, setJudgmentText] = useState("");
+  const [audience, setAudience] = useState(false);
+  const [magnet, setMagnet] = useState(false);
+  const [butter, setButter] = useState(false);
+  const butterAt = useRef(0);
+  const [exitOpen, setExitOpen] = useState(false);
+  const [legalMsg, setLegalMsg] = useState<string | null>(null);
+  const [nlEmail, setNlEmail] = useState("");
+  const [unsubN, setUnsubN] = useState(0);
+  const [unsubFixed, setUnsubFixed] = useState(false);
+  const [unsubPos, setUnsubPos] = useState({ x: 0, y: 0 });
+  const [heroSub, setHeroSub] = useState("the app that does the opposite of what you want. enterprise ready.");
+  const [heroUsers, setHeroUsers] = useState(3482901);
   const pacifistRef = useRef(false);
   const prisonRef = useRef(false);
   const gagCountRef = useRef(0);
@@ -115,6 +151,7 @@ export default function OppositeExe() {
   const [fakeCursor, setFakeCursor] = useState({ x: -100, y: -100 });
   const [updateOpen, setUpdateOpen] = useState(false);
   const [updateProgress, setUpdateProgress] = useState(0);
+  const [updateMsg, setUpdateMsg] = useState("installing update 3 of 47...");
   const [delStage, setDelStage] = useState(0);
   const [yesDodges, setYesDodges] = useState(0);
   const [yesFixed, setYesFixed] = useState(false);
@@ -151,6 +188,12 @@ export default function OppositeExe() {
   const supaAdmin = useRef(false);
   const lastSupaRef = useRef(0);
   const supaChatRef = useRef<((text: string) => void) | null>(null);
+  const lastSentRef = useRef(0);
+  const roomSendRef = useRef<((text: string) => void) | null>(null);
+  const vidRef = useRef("");
+  const [roomCount, setRoomCount] = useState(0);
+  const [chatPh, setChatPh] = useState("ask anything...");
+  const knownRef = useRef<Record<string, string>>({});
   const lastAdminRef = useRef(0);
   const joinedAt = useRef(Date.now());
 
@@ -187,7 +230,7 @@ export default function OppositeExe() {
 
   useEffect(() => {
     const titleInterval = setInterval(() => {
-      if (document.hidden) return;
+      if (document.hidden || tabPanicRef.current) return;
       document.title = TITLES[Math.floor(Math.random() * TITLES.length)];
     }, 3000);
     const toastInterval = setInterval(() => {
@@ -206,10 +249,10 @@ export default function OppositeExe() {
     };
     window.addEventListener('mousemove', handleMouseMove);
     const handleWheel = (e: WheelEvent) => {
-      e.preventDefault();
       if (prisonRef.current) { e.preventDefault(); return; }
       const t = e.target as HTMLElement;
-      if (t && t.closest && t.closest("[data-modal-scroll]")) return;
+      if (t && t.closest && (t.closest("[data-panel]") || t.closest("[data-modal-scroll]"))) return;
+      e.preventDefault();
       window.scrollBy({ top: -e.deltaY, behavior: 'auto' });
     };
     window.addEventListener('wheel', handleWheel, { passive: false });
@@ -218,6 +261,7 @@ export default function OppositeExe() {
         document.title = BETRAYAL_TITLES[Math.floor(Math.random() * BETRAYAL_TITLES.length)];
       } else {
         setToast("oh NOW you come back");
+        setHeroSub((s) => (s === HERO_SUBS[0] ? HERO_SUBS[1] : s === HERO_SUBS[1] ? HERO_SUBS[2] : HERO_SUBS[0]));
         setTimeout(() => setToast(null), 4000);
       }
     };
@@ -651,22 +695,65 @@ export default function OppositeExe() {
   useEffect(() => {
     let dead = false;
     let beatTimer: ReturnType<typeof setInterval> | null = null;
+    type SupaClient = { removeAllChannels: () => void; channel: (n: string) => { subscribe: (cb?: (s: string, e?: Error) => void) => void; track: (o: object) => void; untrack: () => void; presenceState: () => Record<string, Array<{ id: string; name: string }>>; on: (t: string, f: object, cb: (m: { payload: never }) => void) => { subscribe: (cb?: (s: string) => void) => void }; send: (m: object) => void } };
+    let sb: SupaClient | null = null;
     (async () => {
       const cfg = await fetch("/api/config").then((r) => r.json()).catch(() => ({ off: true }));
-      if (dead || cfg.off || !cfg.supaUrl || !cfg.supaKey) return;
-      const { supa } = await import("@/utils/supabase/client");
       if (dead) return;
-      const sb = supa();
-      if (!sb) return;
+      if (cfg.off || !cfg.supaUrl || !cfg.supaKey) {
+        console.log("[supabase] offline: env vars missing");
+        return;
+      }
+      let supaFn: (() => unknown) | null = null;
+      try {
+        supaFn = (await import("@/utils/supabase/client")).supa;
+      } catch (e) {
+        console.log("[supabase] client import failed", e);
+        return;
+      }
+      if (dead) return;
+      sb = supaFn() as SupaClient | null;
+      if (!sb) {
+        console.log("[supabase] offline: env vars missing");
+        return;
+      }
       const N = ["anxious potato", "suspicious raccoon", "nervous pickle", "certified lurker", "button misser", "professional scroller", "lost tourist", "chronic clicker", "vibe checker", "confused goblin"];
       const nm = N[Math.floor(Math.random() * N.length)] + " #" + (1 + Math.floor(Math.random() * 9));
       codeNameRef.current = nm;
       const vid = "v" + Math.random().toString(36).slice(2) + Date.now().toString(36);
+      vidRef.current = vid;
+      try { sessionStorage.setItem("opp_vid", vid); } catch { /* no pocket */ }
       const started = Date.now();
       const vis = sb.channel("visitors");
-      const hello = () => { try { vis.track({ id: vid, name: nm, joinedAt: started, lastActive: Date.now() }); } catch { /* shy */ } };
-      vis.subscribe((status: string) => { if (status === "SUBSCRIBED" && !dead) hello(); });
+      const hello = () => { try { vis.track({ id: vid, name: nm, joinedAt: started, lastActive: Date.now() }); } catch (e) { console.log("[supabase] track failed", e); } };
+      vis.subscribe((status: string, err?: Error) => {
+        console.log("[supabase] visitors subscribe:", status, err || "");
+        if (status === "SUBSCRIBED" && !dead) hello();
+        else if (!dead) console.log("[supabase] offline: subscribe failed: " + status);
+      });
       beatTimer = setInterval(() => { if (dead) return; hello(); if (supaAdmin.current && Date.now() - lastSupaRef.current > 30000) supaAdmin.current = false; }, 15000);
+      vis.on("presence", { event: "sync" }, () => {
+        const state = vis.presenceState() as Record<string, Array<{ id: string; name: string }>>;
+        const ids = Object.keys(state);
+        console.log("[supabase] presence sync:", JSON.stringify(state));
+        setRoomCount(ids.length);
+        ids.forEach((k) => {
+          const v = state[k][0];
+          if (v && v.id && v.id !== vidRef.current && !knownRef.current[v.id]) {
+            knownRef.current[v.id] = v.name;
+            console.log("[supabase] presence join:", v.name);
+            setChatMsgs((prev) => [...prev.slice(-29), { me: false, text: v.name + " joined the chat", k: "j" + v.id, name: "", at: Date.now() }]);
+          }
+        });
+        Object.keys(knownRef.current).forEach((id) => {
+          if (ids.indexOf(id) < 0) {
+            const nm2 = knownRef.current[id];
+            delete knownRef.current[id];
+            console.log("[supabase] presence leave:", nm2);
+            setChatMsgs((prev) => [...prev.slice(-29), { me: false, text: nm2 + " fled", k: "f" + Date.now() + id.slice(-4), name: "", at: Date.now() }]);
+          }
+        });
+      });
       const spyCh = sb.channel("spy");
       spyCh.subscribe();
       spySendRef.current = (msg: string) => {
@@ -684,6 +771,19 @@ export default function OppositeExe() {
         .subscribe();
       const support = sb.channel("support");
       support.subscribe();
+      const room = sb.channel("room");
+      room
+        .on("broadcast", { event: "msg" }, (m: { payload: RoomMsg }) => {
+          const d = m.payload;
+          if (!d || !d.text || d.id === vidRef.current) return;
+          setChatMsgs((prev) => [...prev.slice(-29), { me: false, text: String(d.text).slice(0, 200), k: "r" + d.at + String(d.id).slice(-4), name: String(d.name || "mystery guest"), at: d.at }]);
+        })
+        .subscribe();
+      roomSendRef.current = (text: string) => {
+        try {
+          room.send({ type: "broadcast", event: "msg", payload: { id: vidRef.current, name: nm, text: text.slice(0, 200), at: Date.now() } });
+        } catch { /* void eats it */ }
+      };
       supaChatRef.current = (text: string) => {
         try {
           support.send({ type: "broadcast", event: "support-msg", payload: { id: vid, name: nm, text: text.slice(0, 500), at: Date.now() } });
@@ -695,6 +795,8 @@ export default function OppositeExe() {
       if (beatTimer) clearInterval(beatTimer);
       spySendRef.current = null;
       supaChatRef.current = null;
+      roomSendRef.current = null;
+      if (sb) { try { sb.removeAllChannels(); } catch { /* already gone */ } }
     };
   }, []);
 
@@ -802,6 +904,8 @@ export default function OppositeExe() {
     setLoadMsg('loading useful content...');
     for (let i = 0; i <= 99; i++) {
       setProgress(i);
+      if (i === 33) setLoadMsg("reticulating splines...");
+      if (i === 66) setLoadMsg("consulting legal...");
       await new Promise(r => setTimeout(r, 20));
     }
     setLoadMsg('almost there...');
@@ -850,6 +954,8 @@ export default function OppositeExe() {
     setScanProgress(0);
     for (let i = 0; i <= 100; i += 2) {
       setScanProgress(i);
+      if (i === 30) setVirusMsg("finding problems you did not know you had...");
+      if (i === 70) setVirusMsg("judging your files...");
       await new Promise(r => setTimeout(r, 40));
     }
     setScanning(false);
@@ -886,36 +992,35 @@ export default function OppositeExe() {
   };
 
   const sendChat = () => {
-    const text = chatInput.trim();
-    if (!text || chatDead) return;
-    if (supaChatRef.current && supaAdmin.current) {
-      setChatMsgs((prev) => [...prev, { me: true, text, k: kid() }]);
-      supaChatRef.current(text);
-      setChatInput("");
+    const text = chatInput.trim().slice(0, 200);
+    if (!text) return;
+    const now = Date.now();
+    if (now - lastSentRef.current < 1000) {
+      setToast("whoa. one scream at a time.");
+      setTimeout(() => setToast(null), 2000);
       return;
     }
-    if (liveAdmin.current) {
-      setChatMsgs((prev) => [...prev, { me: true, text, k: kid() }]);
-      fetch("/api/signal", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ kind: "chat", id: sidRef.current, name: nameRef.current, text }) }).catch(() => {});
-      setChatInput("");
-      return;
-    }
-    spy(codeNameRef.current + " asked support for help. adorable.");
-    const userCount = chatMsgs.filter(m => m.me).length;
-    setChatMsgs(prev => [...prev, { me: true, text, k: kid() }]);
-    setChatInput('');
-    setTimeout(() => {
-      if (userCount < 2) {
-        setChatMsgs(prev => [...prev, { me: false, text: CHAT_REPLIES[userCount], k: kid() }]);
-      } else if (userCount === 2) {
-        setChatMsgs(prev => [...prev, { me: false, text: CHAT_REPLIES[2], k: kid() }]);
-      } else {
-        setChatMsgs(prev => [...prev, { me: false, text: "this chat has been disconnected. emotionally.", k: kid() }]);
-        setChatDead(true);
-      }
-    }, 800);
+    lastSentRef.current = now;
+    const msg = { me: true, text, k: kid(), name: codeNameRef.current, at: now };
+    setChatMsgs((prev) => [...prev.slice(-29), msg]);
+    setChatInput("");
+    try {
+      if (roomSendRef.current) roomSendRef.current(text);
+    } catch { /* void eats it */ }
   };
 
+  const subscribeNl = () => {
+    if (nlEmail.trim() === "") return;
+    setNlEmail("");
+    setToast("you are on the list now. there is no off the list.");
+    setTimeout(() => setToast(null), 4000);
+  };
+  const dodgeUnsub = () => {
+    if (unsubN >= 3) return;
+    setUnsubFixed(true);
+    setUnsubPos({ x: Math.random() * (window.innerWidth - 160), y: Math.random() * (window.innerHeight - 60) });
+    setUnsubN((n) => n + 1);
+  };
   const downloadRam = () => {
     const blob = new Blob(['lol no'], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
@@ -943,6 +1048,9 @@ export default function OppositeExe() {
       p += Math.random() < 0.25 ? -Math.floor(Math.random() * 8) : Math.floor(Math.random() * 6) + 1;
       p = Math.max(0, Math.min(99, p));
       setUpdateProgress(p);
+      if (p > 25 && p < 30) setUpdateMsg("downloading disappointment...");
+      if (p > 55 && p < 60) setUpdateMsg("installing regrets...");
+      if (p > 85) setUpdateMsg("giving up... no wait, done. no. failed.");
       await new Promise(r => setTimeout(r, 200));
     }
     setUpdateOpen(false);
@@ -1069,6 +1177,181 @@ export default function OppositeExe() {
       setTimeout(() => setToast(null), 3000);
     }, 4000);
   };
+  const toggleTabPanic = (v: boolean) => { setTabPanic(v); tabPanicRef.current = v; };
+  const slowNetStart = () => {
+    setSlowNet(true);
+    setTimeout(() => setSlowNet(false), 6000);
+  };
+  useEffect(() => {
+    if (!indepCursor) return;
+    const pos = { x: window.innerWidth / 2, y: window.innerHeight / 2 };
+    let ang = Math.random() * Math.PI * 2;
+    let raf = 0;
+    const clickTimer = setInterval(() => {
+      const el = document.elementFromPoint(pos.x, pos.y);
+      if (el && el.tagName === "BUTTON") (el as HTMLButtonElement).click();
+    }, 2200);
+    const loop = () => {
+      raf = requestAnimationFrame(loop);
+      ang += 0.05;
+      const tx = mouseRef.current.x + Math.cos(ang) * 180;
+      const ty = mouseRef.current.y + Math.sin(ang * 1.3) * 140;
+      pos.x += (tx - pos.x) * 0.08;
+      pos.y += (ty - pos.y) * 0.08;
+      setCursor2({ x: pos.x, y: pos.y });
+    };
+    loop();
+    return () => { cancelAnimationFrame(raf); clearInterval(clickTimer); };
+  }, [indepCursor]);
+  useEffect(() => {
+    if (!gremlin) return;
+    let n = 0;
+    const t = setTimeout(() => setGremlin(false), 15000);
+    const onKey = (e: KeyboardEvent) => {
+      const el = document.activeElement as HTMLInputElement | null;
+      if (!el || (el.tagName !== "INPUT" && el.tagName !== "TEXTAREA")) return;
+      n += 1;
+      if (n % 5 !== 0) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const words = ["lol", "nope", "oops", "haha"];
+      const w = words[Math.floor(Math.random() * words.length)];
+      try {
+        const proto = (el.tagName === "TEXTAREA" ? HTMLTextAreaElement : HTMLInputElement).prototype;
+        const setter = Object.getOwnPropertyDescriptor(proto, "value")?.set;
+        if (setter) setter.call(el, el.value + w);
+        el.dispatchEvent(new Event("input", { bubbles: true }));
+      } catch { /* gremlin got bored */ }
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => { window.removeEventListener("keydown", onKey, true); clearTimeout(t); };
+  }, [gremlin]);
+  useEffect(() => {
+    if (!tabPanic) return;
+    const msgs = ["please come back", "i can change", "they left, didn" + String.fromCharCode(39) + "t they"];
+    let i = 0;
+    const t = setInterval(() => { document.title = msgs[i % msgs.length]; i += 1; }, 1200);
+    return () => clearInterval(t);
+  }, [tabPanic]);
+  const popStart = () => {
+    popupSpawned.current = 0;
+    popupN.current += 1;
+    popupSpawned.current = 1;
+    setPopups([popupN.current]);
+  };
+  const popClose = (id: number) => {
+    setPopups((prev) => {
+      const rest = prev.filter((x) => x !== id);
+      if (rest.length === 0 && popupSpawned.current >= 5) {
+        setTimeout(() => { setToast("fine. be that way."); setTimeout(() => setToast(null), 3000); }, 300);
+        return rest;
+      }
+      if (popupSpawned.current < 5) {
+        const add: number[] = [];
+        while (rest.length + add.length < Math.min(5, popupSpawned.current + 2)) { popupN.current += 1; popupSpawned.current += 1; add.push(popupN.current); }
+        return [...rest, ...add];
+      }
+      return rest;
+    });
+  };
+  const rainStart = () => {
+    setRainDrops(Array.from({ length: 30 }, (_, i) => i));
+    setEmojiRain(true);
+    setTimeout(() => { setEmojiRain(false); setRainDrops([]); }, 8000);
+  };
+  const autoStart = () => {
+    if (autopilot) return;
+    setAutopilot(true);
+    setToast("let me show you around. you clearly can" + String.fromCharCode(39) + "t be trusted");
+    setTimeout(() => setToast(null), 2500);
+    const lines = ["this button does nothing. watch.", "and here is where you gave up last time.", "ok tour over. you learned nothing."];
+    lines.forEach((l, i) => setTimeout(() => { setToast(l); setTimeout(() => setToast(null), 2200); }, 3000 + i * 2500));
+    const t0 = Date.now();
+    const timer = setInterval(() => {
+      if (Date.now() - t0 > 10000) { clearInterval(timer); setAutopilot(false); return; }
+      setAutoPos({ x: 80 + Math.random() * (window.innerWidth - 160), y: 80 + Math.random() * (window.innerHeight - 160) });
+    }, 1200);
+  };
+  const shakeStart = () => {
+    setShakespeare(true);
+    setToast("prithee, enjoy thy fancy words. 20 seconds.");
+    setTimeout(() => setToast(null), 2500);
+    setTimeout(() => setShakespeare(false), 20000);
+  };
+  const judgeStart = () => {
+    const fails = captchaClicks + imgFails;
+    const full = "session report: wasted " + clock + ". buttons missed: " + clickCount.current + ". captcha fails: " + fails + ". username attempts: " + usernameAttempts + ". grade: D- (generous)";
+    setJudgment(true);
+    setJudgmentText("");
+    let i = 0;
+    const timer = setInterval(() => {
+      i += 1;
+      setJudgmentText(full.slice(0, i));
+      if (i >= full.length) clearInterval(timer);
+    }, 18);
+  };
+  useEffect(() => {
+    if (!magnet) return;
+    const move = (e: MouseEvent) => {
+      document.querySelectorAll("button").forEach((b) => {
+        const el = b as HTMLElement;
+        if (el.closest("[data-no-flee]")) return;
+        const r = b.getBoundingClientRect();
+        const dx = (r.left + r.width / 2) - e.clientX;
+        const dy = (r.top + r.height / 2) - e.clientY;
+        const d = Math.max(40, Math.sqrt(dx * dx + dy * dy));
+        if (d < 200) {
+          const push = (200 - d) / 3;
+          el.style.transform = "translate(" + (dx / d * push).toFixed(1) + "px," + (dy / d * push).toFixed(1) + "px)";
+        } else { el.style.transform = ""; }
+      });
+    };
+    window.addEventListener("mousemove", move);
+    return () => {
+      window.removeEventListener("mousemove", move);
+      document.querySelectorAll("button").forEach((b) => { (b as HTMLElement).style.transform = ""; });
+    };
+  }, [magnet]);
+  useEffect(() => {
+    if (!butter) return;
+    const onClick = (e: MouseEvent) => {
+      if (Math.random() < 0.3) {
+        e.preventDefault();
+        e.stopPropagation();
+        if (Date.now() - butterAt.current > 2000) {
+          butterAt.current = Date.now();
+          setToast("nice aim");
+          setTimeout(() => setToast(null), 1500);
+        }
+      }
+    };
+    window.addEventListener("click", onClick, true);
+    return () => window.removeEventListener("click", onClick, true);
+  }, [butter]);
+  useEffect(() => {
+    const t = setInterval(() => {
+      if (Math.random() < 0.08) {
+        const loss = 1 + Math.floor(Math.random() * 5);
+        setHeroUsers((u) => u - loss);
+        if (Math.random() < 0.4) { setToast("another one left. fair."); setTimeout(() => setToast(null), 2500); }
+      } else {
+        setHeroUsers((u) => u + Math.floor(Math.random() * 4));
+      }
+    }, 3000);
+    return () => clearInterval(t);
+  }, []);
+  useEffect(() => {
+    const onMove = (e: MouseEvent) => {
+      if (gravity) return;
+      const cx = e.clientX / window.innerWidth - 0.5;
+      const cy = e.clientY / window.innerHeight - 0.5;
+      document.querySelectorAll("[data-tilt]").forEach((el) => {
+        (el as HTMLElement).style.transform = "perspective(800px) rotateY(" + (cx * 6).toFixed(2) + "deg) rotateX(" + (-cy * 6).toFixed(2) + "deg)";
+      });
+    };
+    window.addEventListener("mousemove", onMove);
+    return () => window.removeEventListener("mousemove", onMove);
+  }, [gravity]);
   const deadLink = () => {
     setToast("nope.");
     setTimeout(() => setToast(null), 2500);
@@ -1090,6 +1373,7 @@ export default function OppositeExe() {
       return;
     }
     deniedArmed.current = false;
+    setAudience(false);
     vineBoom();
     setToast("admin detected. this is legally binding.");
     setTimeout(() => {
@@ -1109,7 +1393,7 @@ export default function OppositeExe() {
   };
   const adminFire = (fn: () => void) => () => { fn(); doJudgment(); };
   const chaosLocal = () => {
-    const pool = ["spin", "invert", "gravity", "drunk", "bsod", "update", "virus", "confetti", "boom", "airhorn", "comic", "crt", "mirror", "cursor", "flood", "flee", "quake", "lights"];
+    const pool = ["spin", "invert", "gravity", "drunk", "bsod", "update", "virus", "confetti", "boom", "airhorn", "comic", "crt", "mirror", "cursor", "flood", "flee", "quake", "lights", "tabpanic", "slownet", "popups", "rain", "clippy", "autopilot", "shake", "judgment"];
     const picks = [...pool].sort(() => Math.random() - 0.5).slice(0, 5);
     picks.forEach((g, i) => setTimeout(() => fireLocalGag(g), i * 700));
     doJudgment();
@@ -1125,6 +1409,19 @@ export default function OppositeExe() {
     else if (g === "boom") vineBoom();
     else if (g === "comic") setIsComicSans(v => !v);
     else if (g === "crt") setCrt(v => !v);
+    else if (g === "cursor") { setBigCursor(true); setTimeout(() => setBigCursor(false), 20000); }
+    else if (g === "gremlin") { setGremlin(true); }
+    else if (g === "tabpanic") toggleTabPanic(!tabPanicRef.current);
+    else if (g === "slownet") slowNetStart();
+    else if (g === "popups") popStart();
+    else if (g === "rain") rainStart();
+    else if (g === "clippy") setClippyOpen(true);
+    else if (g === "autopilot") autoStart();
+    else if (g === "shake") shakeStart();
+    else if (g === "judgment") judgeStart();
+    else if (g === "audience") setAudience(true);
+    else if (g === "magnet") setMagnet(v => !v);
+    else if (g === "butter") setButter(v => !v);
     else if (g === "virus") startVirusScan();
     else if (g === "airhorn") playAirhorn();
     else if (g === "mirror") setMirrored(v => !v);
@@ -1164,6 +1461,7 @@ export default function OppositeExe() {
         transition: "transform 1s ease-in-out"
       }}
     >
+      <div className="fixed inset-0 z-0 pointer-events-none" style={{ background: "radial-gradient(ellipse at 20% 0%, rgba(139,92,246,0.12), transparent 60%), radial-gradient(ellipse at 85% 100%, rgba(34,211,238,0.10), transparent 60%)" }} />
       {matrix && <canvas ref={matrixRef} className="fixed inset-0 z-0 pointer-events-none opacity-70" />}
 
       {!booted && (
@@ -1219,10 +1517,58 @@ export default function OppositeExe() {
         </PortalBox>
       )}
 
+      {clippyOpen && <Clippy open={clippyOpen} onClose={() => setClippyOpen(false)} />}
+      {exitOpen && <ExitLoop open={exitOpen} onStay={() => { setExitOpen(false); setToast("good choice. there was never a door."); setTimeout(() => setToast(null), 3000); }} />}
+      {slowNet && (
+        <PortalBox>
+          <div className="fixed inset-0 z-[150] bg-black/85 flex flex-col items-center justify-center">
+            <div className="w-12 h-12 border-4 border-slate-700 border-t-cyan-400 rounded-full animate-spin" />
+            <p className="mt-4 font-mono text-sm">buffering... because of you specifically</p>
+          </div>
+        </PortalBox>
+      )}
+      {popups.length > 0 && (
+        <PortalBox>
+          <>
+            {popups.map((id, ix) => (
+              <div key={id} className="fixed z-[120] bg-zinc-200 text-black border-4 border-black rounded-lg p-3 w-64 max-w-[80vw] shadow-xl" style={{ left: (20 + (ix * 67) % 300) + "px", top: (90 + (ix * 53) % 300) + "px" }}>
+                <p className="font-black text-sm">congratulations!! you won (nothing)</p>
+                <p className="text-xs mt-1">popup {ix + 1} of many. closing makes more.</p>
+                <button onClick={() => popClose(id)} className="mt-2 bg-black text-white text-xs font-bold px-2 py-1 rounded">close (bad idea)</button>
+              </div>
+            ))}
+          </>
+        </PortalBox>
+      )}
+      {emojiRain && (
+        <PortalBox>
+          <div className="fixed inset-0 z-[140] pointer-events-none overflow-hidden">
+            {rainDrops.map((d) => (
+              <span key={d} className="absolute text-3xl emoji-fall" style={{ left: ((d * 37) % 100) + "%", animationDelay: ((d % 10) * 0.3) + "s", top: "-3rem" }}>{"\u{1F480}"}</span>
+            ))}
+          </div>
+        </PortalBox>
+      )}
+      {judgment && (
+        <PortalBox>
+          <div className="fixed inset-0 z-[150] bg-black/90 flex items-center justify-center p-6">
+            <div className="max-w-lg font-mono w-full">
+              <p className="text-red-500 font-black mb-4">JUDGMENT DAY</p>
+              <p className="text-sm whitespace-pre-wrap">{judgmentText}<span className="animate-pulse">_</span></p>
+              <button onClick={() => setJudgment(false)} className="mt-6 bg-red-600 px-4 py-2 rounded font-bold text-sm">accept your grade</button>
+            </div>
+          </div>
+        </PortalBox>
+      )}
+      {autopilot && (
+        <PortalBox>
+          <div className="fixed z-[49] pointer-events-none text-3xl" style={{ left: autoPos.x - 14, top: autoPos.y - 14 }}>{"\u{1F446}"}</div>
+        </PortalBox>
+      )}
       {updateOpen && (
         <PortalBox>
           <div className="fixed inset-0 z-[150] bg-blue-950 text-white flex flex-col items-center justify-center font-mono p-6 text-center">
-            <p className="text-xl mb-4">installing update 3 of 47...</p>
+            <p className="text-xl mb-4">{updateMsg}</p>
             <div className="w-64 max-w-[80vw] h-4 bg-blue-900 rounded overflow-hidden">
               <div className="h-full bg-cyan-400 transition-all" style={{ width: `${updateProgress}%` }} />
             </div>
@@ -1332,25 +1678,27 @@ export default function OppositeExe() {
       </PortalBox>
 
       <PortalBox>
-        <div className="fixed bottom-4 right-4 z-[50] w-64 md:w-72 max-w-[70vw]">
+        {!audience && (<div className="fixed bottom-4 right-4 z-[50] w-64 md:w-72 max-w-[70vw]">
           {!chatOpen ? (
             <button
               onClick={() => setChatOpen(true)}
               className="ml-auto block bg-green-600 text-white text-xs font-black uppercase px-4 py-2 rounded-full shadow-lg"
             >
-              24/7 support
+              victims' chat
             </button>
           ) : (
             <div className={`bg-slate-800 rounded-2xl border-4 border-black shadow-xl overflow-hidden ${comic}`}>
               <div className="bg-green-700 px-3 py-2 flex justify-between items-center">
-                <span className="text-xs font-black uppercase">definitely real support</span>
+                <span className="text-xs font-black uppercase">victims' chat • {roomCount} here</span>
                 <button onClick={() => setChatOpen(false)} className="text-xs font-bold px-2">_</button>
               </div>
               <div data-modal-scroll className="h-48 overflow-y-auto p-2 space-y-2 text-xs">
                 {chatMsgs.map((m) => (
-                  <div key={m.k} className={cn("p-2 rounded-lg max-w-[90%]", m.me ? "ml-auto bg-blue-600" : "bg-slate-700")}>
-                    {m.text}
-                  </div>
+                  <motion.div key={m.k} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className={cn("p-2 rounded-lg max-w-[90%]", m.me ? "ml-auto bg-blue-600 text-right" : "bg-slate-700")}>
+                    {!m.me && m.name !== "" && <p className="text-[10px] font-bold text-lime-400">{m.name}</p>}
+                    <p>{m.text}</p>
+                    {m.at ? <p className="text-[10px] opacity-60">{new Date(m.at).toLocaleTimeString()}</p> : null}
+                  </motion.div>
                 ))}
               </div>
               <div className="p-2 flex gap-1">
@@ -1358,15 +1706,20 @@ export default function OppositeExe() {
                   value={chatInput}
                   onChange={(e) => setChatInput(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && sendChat()}
-                  disabled={chatDead}
-                  placeholder={chatDead ? "gone. forever." : "ask anything..."}
+                  placeholder={chatPh}
+                  maxLength={200}
                   className="flex-1 bg-slate-900 text-xs p-2 rounded outline-none min-w-0"
                 />
-                <button onClick={sendChat} disabled={chatDead} className="bg-green-600 text-xs font-bold px-2 rounded">send</button>
+                <button
+                  onMouseEnter={() => { if (Math.random() < 0.1) { setChatPh("scream into the void"); setTimeout(() => setChatPh("ask anything..."), 3000); } }}
+                  onClick={sendChat}
+                  className="bg-green-600 text-xs font-bold px-2 rounded"
+                >send</button>
               </div>
             </div>
           )}
         </div>
+      )}
       </PortalBox>
 
       <div className="relative z-10 p-4 md:p-12 max-w-5xl mx-auto text-slate-100 pt-12">
@@ -1377,20 +1730,20 @@ export default function OppositeExe() {
             <div className="flex gap-4 text-sm font-bold">
               <button onClick={deadLink}>features</button>
               <button onClick={deadLink}>pricing</button>
-              <button onClick={() => setChatOpen(true)}>contact</button>
+              <button onClick={() => setExitOpen(true)} className="text-red-400">exit</button>
             </div>
           </nav>
-          <div className="text-center rounded-3xl bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-500 p-8 md:p-16 border-4 border-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]">
+          <div data-tilt className="text-center rounded-3xl bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-500 p-8 md:p-16 border-4 border-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]">
             <p className="text-xs font-bold uppercase tracking-[0.3em] mb-4 opacity-80">{"\u2728"} now with 47% more opposite {"\u2728"}</p>
             <h1 className="font-display text-4xl md:text-7xl font-bold tracking-tight mb-4">productivity, perfected.</h1>
-            <p className="text-sm md:text-lg opacity-90 mb-8">the app that does the opposite of what you want. enterprise ready.</p>
+            <p className="text-sm md:text-lg opacity-90 mb-8">{heroSub}</p>
             <div className="flex flex-col sm:flex-row gap-3 justify-center">
               <button
                 onClick={() => {
                   setToast("just kidding. there's nothing to start.");
                   setTimeout(() => setToast(null), 3000);
                 }}
-                className="bg-white text-black px-6 py-3 rounded-xl font-black uppercase text-sm"
+                title="why would you do that" className="bg-white text-black px-6 py-3 rounded-xl font-black uppercase text-sm transition-transform duration-200 hover:-translate-x-1 hover:translate-y-[2px]"
               >
                 start free
               </button>
@@ -1399,7 +1752,7 @@ export default function OppositeExe() {
               </button>
             </div>
           </div>
-          <p className="text-center text-xs text-slate-500 mt-4 italic">as seen on: nobody. nowhere.</p>
+          <p className="text-center font-mono text-xs text-lime-400 mt-4"><span className="font-black">{heroUsers.toLocaleString()}</span> users and counting. mostly counting down.</p>
           <div className="mt-6 text-xl font-bold bg-yellow-400 text-black py-1 overflow-hidden whitespace-nowrap rounded-xl border-4 border-black">
             <div className="inline-block animate-marquee-scroll">
               welcome to the worst experience of your life • please leave immediately • we know where you live • L + ratio •&nbsp;
@@ -1512,7 +1865,7 @@ export default function OppositeExe() {
                       scan my device
                     </button>
                   )}
-                  {scanning && <p className="text-xs font-bold italic">scanning... {scanProgress}% (finding problems)</p>}
+                  {scanning && <p className="text-xs font-bold italic">{virusMsg} {scanProgress}%</p>}
                 </>
               ) : (
                 <>
@@ -1658,21 +2011,25 @@ export default function OppositeExe() {
             )}
           </section>
 
-          <section className="col-span-1 md:col-span-2 bg-slate-800 p-8 rounded-3xl border-4 border-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] overflow-hidden">
+          <section className="col-span-1 md:col-span-2 bg-slate-800 p-8 rounded-3xl border-4 border-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]">
             <h2 className="text-2xl font-black mb-6 uppercase italic text-center">real reviews from real humans</h2>
-            <div className="overflow-hidden whitespace-nowrap">
-              <div className="inline-flex gap-8 animate-marquee-scroll">
-                {[...TESTIMONIALS, ...TESTIMONIALS].map((t) => (
-                  <div key={t.author} className="bg-slate-900 p-4 rounded-xl min-w-[16rem] whitespace-normal">
-                    <p className="text-sm italic">&quot;{t.text}&quot;</p>
-                    <p className="text-xs text-yellow-400 font-bold mt-2">— {t.author}</p>
-                    <p className="text-yellow-400 text-xs">{"\u2605".repeat(5)}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
+            <Testimonials notify={notifyToast} />
           </section>
 
+          <section className="col-span-1 md:col-span-2 bg-slate-800 p-8 rounded-3xl border-4 border-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]">
+            <h2 className="text-2xl font-black mb-6 uppercase italic text-center">system status (trust us)</h2>
+            <div className="space-y-2 text-sm font-bold">
+              <div className="flex justify-between bg-slate-900 p-3 rounded-xl"><span>website</span><span className="text-green-400">operational-ish</span></div>
+              <div className="flex justify-between bg-slate-900 p-3 rounded-xl"><span>buttons</span><span className="text-green-400">operational*</span></div>
+              <div className="flex justify-between bg-slate-900 p-3 rounded-xl"><span>support chat</span><span className="text-green-400">operational (there is none)</span></div>
+              <div className="flex justify-between bg-slate-900 p-3 rounded-xl"><span>vibes</span><span className="text-amber-400">degraded</span></div>
+              <p className="text-xs italic text-slate-500">* buttons work. just not for you. incident #47 open for 47 days: the vibes remain degraded. we have stopped asking.</p>
+            </div>
+          </section>
+          <section className="bg-slate-800 p-8 rounded-3xl border-4 border-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] transition-all duration-700">
+            <h2 className="text-2xl font-black mb-6 uppercase italic">frequently avoided questions</h2>
+            <Faq notify={notifyToast} />
+          </section>
           <section className="col-span-1 md:col-span-2 bg-slate-800 p-8 rounded-3xl border-4 border-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]">
             <h2 className="font-display text-2xl font-bold mb-6 uppercase text-center">pricing (everyone pays nothing)</h2>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -1715,6 +2072,30 @@ export default function OppositeExe() {
             notify={notifyJudged}
             speak={sayLoud}
           />
+          <section className="col-span-1 md:col-span-2 bg-slate-800 p-8 rounded-3xl border-4 border-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] space-y-6">
+            <h2 className="text-2xl font-black uppercase italic text-center">never miss a disaster</h2>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <input value={nlEmail} onChange={(e) => setNlEmail(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") subscribeNl(); }} placeholder="your@email.com (mistake)" className="flex-1 bg-slate-100 text-black p-3 rounded-lg font-bold outline-none min-w-0" />
+              <button onClick={subscribeNl} className="bg-pink-600 px-6 py-3 rounded-lg font-black uppercase text-sm">subscribe</button>
+            </div>
+            <div className="text-center">
+              <button onMouseEnter={dodgeUnsub} onTouchStart={dodgeUnsub} onClick={() => { setToast("unsubscribe failed. there is no off the list."); setTimeout(() => setToast(null), 3000); }} className="text-xs underline opacity-60" style={unsubFixed ? { position: "fixed", left: unsubPos.x, top: unsubPos.y, zIndex: 60 } : {}}>unsubscribe</button>
+            </div>
+            <div className="flex flex-wrap gap-4 justify-center text-xs pt-4 border-t border-slate-700">
+              <button onClick={() => setLegalMsg("you actually clicked this. wow.")} className="underline opacity-60">privacy</button>
+              <button onClick={() => setLegalMsg("you actually clicked this. wow.")} className="underline opacity-60">terms</button>
+              <button onClick={() => setLegalMsg("you actually clicked this. wow.")} className="underline opacity-60">cookies</button>
+              <a href="https://www.youtube.com/watch?v=dQw4w9WgXcQ" target="_blank" rel="noreferrer" className="underline opacity-60">contact (definitely safe)</a>
+            </div>
+          </section>
+          {legalMsg && (
+            <Modal comic={comic}>
+              <div className="bg-slate-800 rounded-2xl border-4 border-black p-6 text-center">
+                <p className="font-bold italic">{legalMsg}</p>
+                <button onClick={() => setLegalMsg(null)} className="mt-4 bg-slate-600 px-4 py-2 rounded font-bold text-sm">close (rude)</button>
+              </div>
+            </Modal>
+          )}
           <section className="col-span-1 md:col-span-2 flex flex-col items-center justify-center p-12 bg-red-900/20 rounded-3xl border-4 border-red-600 border-dashed">
             <h2 className="text-3xl font-black mb-8 uppercase italic text-red-500 animate-pulse">DO NOT PRESS</h2>
             <motion.button

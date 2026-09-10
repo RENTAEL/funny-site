@@ -39,3 +39,10 @@ body {
 .quake-shake {
   animation: quake-shake 0.25s infinite;
 }
+@keyframes emoji-fall {
+  from { transform: translateY(-10vh) rotate(0deg); }
+  to { transform: translateY(110vh) rotate(360deg); }
+}
+.emoji-fall {
+  animation: emoji-fall 4s linear infinite;
+}

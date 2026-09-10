@@ -3,6 +3,7 @@ let client: ReturnType<typeof createClient> | null = null;
 export function supa() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  console.log("[supabase] env present:", !!url, !!key);
   if (!url || !key) return null;
   if (!client) client = createClient(url, key);
   return client;

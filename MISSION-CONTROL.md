@@ -11,3 +11,10 @@ admin: pick a target (this screen / everyone / one victim), fire gags, toast, sp
 support inbox: visitor messages arrive live, target a message, reply as support.
 god toggles: hold still (freeze dodging), silence (stop toasts + roasts), skip the terms, pacifist (all gags off).
 chaos button fires 5 random gags. every action has a 20% judgment toast. obviously.
+--- group therapy update ---
+fake support is now a REAL public chat (supabase broadcast channel "room").
+your codename is your chat name. 200 chars max, 1 message per second, last 30 kept.
+join/leave lines appear automatically, header shows live victim count, html renders as plain text.
+the send button sometimes chickens out (10%) but messages always send. probably.
+admin sees the room feed in mission control, posts as "opposite.exe support team",
+can shadowban names (local hide only). nothing is stored anywhere. obviously.

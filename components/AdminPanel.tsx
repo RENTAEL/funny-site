@@ -24,7 +24,7 @@ type Visitor = { id: string; name: string; joinedAt: number; lastActive: number 
 type SpyMsg = { from: string; text: string; at: number; k: string };
 type SupportMsg = { id: string; name: string; text: string; at: number; k: string };
 let inboxK = 1;
-const GAGS = ["spin", "invert", "gravity", "drunk", "bsod", "update", "virus", "confetti", "boom", "airhorn", "comic", "crt", "mirror", "cursor", "flood", "flee", "quake", "lights"];
+const GAGS = ["spin", "invert", "gravity", "drunk", "bsod", "update", "virus", "confetti", "boom", "airhorn", "comic", "crt", "mirror", "cursor", "flood", "flee", "quake", "lights", "tabpanic", "slownet", "popups", "rain", "clippy", "autopilot", "shake", "judgment", "audience", "magnet", "butter"];
 function rel(ts: number, now: number) {
   const s = Math.max(0, Math.floor((now - ts) / 1000));
   if (s < 5) return "just now";
@@ -48,6 +48,9 @@ export default function AdminPanel(p: Props) {
   const [toastText, setToastText] = useState("");
   const [speakText, setSpeakText] = useState("");
   const [supaOn, setSupaOn] = useState(false);
+  const [rts, setRts] = useState({ st: "connecting", reason: "" });
+  const [myId, setMyId] = useState("");
+  const sbRef = useRef<{ removeAllChannels: () => void } | null>(null);
   const [visitors, setVisitors] = useState<Record<string, Visitor>>({});
   const [visitorsRef, setVisitorsRef] = useState<Record<string, Visitor>>({});
   const vref = useRef<Record<string, Visitor>>({});
@@ -69,22 +72,36 @@ export default function AdminPanel(p: Props) {
     return () => clearInterval(t);
   }, []);
   useEffect(() => {
+    try { setMyId(sessionStorage.getItem("opp_vid") || ""); } catch { /* no pocket */ }
     if (!p.open) return;
     let dead = false;
     const timers: ReturnType<typeof setInterval>[] = [];
     fetch("/api/config")
       .then((r) => r.json())
       .then(async (cfg) => {
-        if (dead || cfg.off || !cfg.supaUrl || !cfg.supaKey) return;
-        const { supa } = await import("@/utils/supabase/client");
         if (dead) return;
-        const sb = supa();
-        if (!sb) return;
+        if (cfg.off || !cfg.supaUrl || !cfg.supaKey) {
+          setRts({ st: "offline", reason: "env vars missing" });
+          return;
+        }
+        let supaFn: (() => unknown) | null = null;
+        try {
+          supaFn = (await import("@/utils/supabase/client")).supa;
+        } catch (e) {
+          console.log("[supabase] client import failed", e);
+          setRts({ st: "offline", reason: "client init failed" });
+          return;
+        }
+        if (dead) return;
+        const sb = supaFn() as { removeAllChannels: () => void; channel: (n: string) => { subscribe: (cb?: (s: string) => void) => void; presenceState: () => Record<string, Array<{ id: string; name: string }>>; track: (o: object) => void; send: (m: object) => void; on: (t: string, f: object, cb: (m: { payload: never }) => void) => { subscribe: (cb?: (s: string) => void) => void } }; };
+        sbRef.current = sb;
+        setRts({ st: "connecting", reason: "" });
         setSupaOn(true);
         const vis = sb.channel("visitors");
         vis
           .on("presence", { event: "sync" }, () => {
             const state = vis.presenceState() as Record<string, Visitor[]>;
+            console.log("[supabase] admin presence sync");
             const next: Record<string, Visitor> = {};
             Object.keys(state).forEach((k) => {
               const v = state[k][0];
@@ -93,12 +110,14 @@ export default function AdminPanel(p: Props) {
             const prev = vref.current;
             Object.keys(next).forEach((id) => {
               if (!prev[id]) {
+                console.log("[supabase] admin presence join:", next[id].name);
                 setFlashId(id);
                 setTimeout(() => setFlashId((f) => (f === id ? null : f)), 2000);
               }
             });
             Object.keys(prev).forEach((id) => {
               if (!next[id]) {
+                console.log("[supabase] admin presence leave:", prev[id].name);
                 setFled((f) => ({ ...f, [id]: { name: prev[id].name, at: Date.now() } }));
                 setTimeout(() => {
                   setFled((f) => {
@@ -113,7 +132,6 @@ export default function AdminPanel(p: Props) {
             setVisitorsRef(next);
             setVisitors(next);
           })
-          .subscribe();
         const spy = sb.channel("spy");
         spy
           .on("broadcast", { event: "spy" }, (m: { payload: SpyMsg }) => {
@@ -121,7 +139,6 @@ export default function AdminPanel(p: Props) {
             if (!d || !d.from) return;
             setFeed((prev) => [...prev.slice(-29), { from: d.from, text: d.text, at: d.at, k: "a" + (inboxK++) }]);
           })
-          .subscribe();
         const support = sb.channel("support");
         support
           .on("broadcast", { event: "support-msg" }, (m: { payload: SupportMsg }) => {
@@ -129,7 +146,6 @@ export default function AdminPanel(p: Props) {
             if (!d || !d.id) return;
             setInbox((prev) => [...prev.slice(-49), { id: d.id, name: d.name, text: d.text, at: d.at, k: "a" + (inboxK++) }]);
           })
-          .subscribe();
         const orders = sb.channel("orders");
         orderSend.current = (to: string, gag: string, arg: string) => {
           try {
@@ -143,6 +159,7 @@ export default function AdminPanel(p: Props) {
         timers.push(setInterval(() => {
           setVisitors((prev) => {
             const now = Date.now();
+            console.log("[supabase] admin presence sync");
             const next: Record<string, Visitor> = {};
             Object.keys(prev).forEach((id) => {
               if (now - prev[id].lastActive < 30000) next[id] = prev[id];
@@ -155,6 +172,8 @@ export default function AdminPanel(p: Props) {
     return () => {
       dead = true;
       timers.forEach((t) => clearInterval(t));
+      orderSend.current = null;
+      if (sbRef.current) { try { sbRef.current.removeAllChannels(); } catch { /* already gone */ } }
     };
   }, [p.open]);
   const sendOrder = (to: string, gag: string, arg: string) => {
@@ -200,7 +219,7 @@ export default function AdminPanel(p: Props) {
   void visitorsRef;
   return (
     <PortalBox>
-      <div className="fixed z-[200] font-mono left-0 right-0 bottom-0 h-[60vh] rounded-t-2xl md:left-auto md:right-0 md:top-0 md:bottom-0 md:h-full md:w-[380px] md:rounded-none bg-slate-950 text-slate-100 border-t-2 md:border-t-0 md:border-l-2 border-red-500 flex flex-col">
+      <div data-panel onWheel={(e) => e.stopPropagation()} onTouchMove={(e) => e.stopPropagation()} className="fixed z-[200] font-mono left-0 right-0 bottom-0 h-[60vh] rounded-t-2xl md:left-auto md:right-0 md:top-0 md:bottom-0 md:h-full md:w-[380px] md:rounded-none bg-slate-950 text-slate-100 border-t-2 md:border-t-0 md:border-l-2 border-red-500 flex flex-col">
         <div className="flex items-center justify-between p-3 border-b border-slate-800 shrink-0" onClick={() => setFolded(true)}>
           <span className="font-black text-sm tracking-widest">opposite control</span>
           <span className="flex gap-2">
@@ -208,8 +227,11 @@ export default function AdminPanel(p: Props) {
             <button onClick={(e) => { e.stopPropagation(); p.onClose(); }} className="font-black px-2">X</button>
           </span>
         </div>
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto overscroll-contain">
           <Section id="surv" title="surveillance" shut={shut} onFlip={flip}>
+            <p className="flex items-center gap-2 text-xs font-black mb-2">
+              {rts.st === "connected" ? (<><span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" /><span>realtime: connected</span></>) : rts.st === "connecting" ? (<><span className="w-2 h-2 rounded-full bg-yellow-500 animate-pulse" /><span>realtime: connecting...</span></>) : (<><span className="w-2 h-2 rounded-full bg-red-500" /><span>realtime: offline{rts.reason !== "" ? ": " + rts.reason : ""}</span></>)}
+            </p>
             {!supaOn && <p className="text-xs italic text-slate-500 bg-slate-900 rounded-xl p-3">mission control: offline (no supabase keys)</p>}
             {supaOn && (
               <div>
@@ -218,7 +240,7 @@ export default function AdminPanel(p: Props) {
                 </p>
                 <button onClick={() => setExpanded(expanded === "all" ? null : "all")} className="w-full bg-red-900 rounded-xl p-2 text-xs font-black uppercase mb-2">fire at everyone {expanded === "all" ? "-" : "+"}</button>
                 {expanded === "all" && fireMenu("all")}
-                <div className="space-y-2 mt-2">
+                <div className="space-y-2 mt-2 max-h-64 overflow-y-auto overscroll-contain">
                   {list.map((v) => {
                     const idleS = Math.floor((now - v.lastActive) / 1000);
                     const idle = idleS > 60;
@@ -228,7 +250,7 @@ export default function AdminPanel(p: Props) {
                         <button onClick={() => setExpanded(expanded === v.id ? null : v.id)} className={`w-full text-left bg-slate-900 rounded-xl p-3 ${idle ? "opacity-60" : ""}`}>
                           <span className="flex items-center gap-2">
                             <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse shrink-0" />
-                            <span className="font-bold text-base">{v.name}</span>
+                            <span className="font-bold text-base">{v.name}{v.id === myId ? " (you)" : ""}</span>
                           </span>
                           <span className="block text-[11px] text-slate-400 mt-1">joined {rel(v.joinedAt, now)} • suffered {countsRef.current[v.id] || 0} gags • {idle ? "idle " + rel(v.lastActive, now) : "active " + rel(v.lastActive, now)}</span>
                         </button>
@@ -246,14 +268,14 @@ export default function AdminPanel(p: Props) {
               </div>
             )}
             <p className="text-xs font-bold uppercase text-slate-400 mt-4 mb-2">spy feed</p>
-            <div className="space-y-1 max-h-40 overflow-y-auto bg-black rounded-xl p-2">
+            <div className="space-y-1 max-h-40 overflow-y-auto overscroll-contain bg-black rounded-xl p-2">
               {feed.length === 0 && <p className="text-slate-500 text-xs italic">no gossip yet.</p>}
               {feed.slice(-8).reverse().map((m) => (
                 <p key={m.k} className="text-[11px]"><span className="text-slate-500">{new Date(m.at).toLocaleTimeString()} </span><span className="font-bold text-lime-400">{m.from}: </span>{m.text}</p>
               ))}
             </div>
             <p className="text-xs font-bold uppercase text-slate-400 mt-4 mb-2">support screams</p>
-            <div className="space-y-1 max-h-32 overflow-y-auto mb-2">
+            <div className="space-y-1 max-h-32 overflow-y-auto overscroll-contain mb-2">
               {inbox.length === 0 && <p className="text-slate-500 text-xs italic">no victims asking for help yet.</p>}
               {inbox.map((m) => (
                 <div key={m.k} className="text-xs bg-slate-900 rounded-lg p-2">
