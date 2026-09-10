@@ -20,7 +20,9 @@ type Props = {
   onScrollPrison: () => void;
 };
 type Visitor = { id: string; name: string; joinedAt: number; lastActive: number };
-type SpyMsg = { from: string; text: string; at: number };
+type SupportMsg = { id: string; name: string; text: string; at: number; k: string };
+type SpyMsg = { from: string; text: string; at: number; k: string };
+let inboxK = 1;
 const GAGS = ["spin", "invert", "gravity", "drunk", "bsod", "update", "virus", "confetti", "boom", "airhorn", "comic", "crt", "mirror", "cursor", "flood", "flee", "quake", "lights"];
 export default function AdminPanel(p: Props) {
   const [ghostText, setGhostText] = useState("");
@@ -32,6 +34,8 @@ export default function AdminPanel(p: Props) {
   const [target, setTarget] = useState("me");
   const [remoteToast, setRemoteToast] = useState("");
   const [remoteSpeak, setRemoteSpeak] = useState("");
+  const [inbox, setInbox] = useState<SupportMsg[]>([]);
+  const [replyText, setReplyText] = useState("");
   const orderSend = useRef<((to: string, gag: string, arg: string) => void) | null>(null);
   useEffect(() => {
     if (!p.open) return;
@@ -41,9 +45,10 @@ export default function AdminPanel(p: Props) {
       .then((r) => r.json())
       .then(async (cfg) => {
         if (dead || cfg.off || !cfg.supaUrl || !cfg.supaKey) return;
-        const { createClient } = await import("@supabase/supabase-js");
+        const { supa } = await import("@/utils/supabase/client");
         if (dead) return;
-        const sb = createClient(cfg.supaUrl, cfg.supaKey);
+        const sb = supa();
+        if (!sb) return;
         setSupaOn(true);
         const vis = sb.channel("visitors");
         vis
@@ -62,7 +67,15 @@ export default function AdminPanel(p: Props) {
           .on("broadcast", { event: "spy" }, (m: { payload: SpyMsg }) => {
             const d = m.payload;
             if (!d || !d.from) return;
-            setFeed((prev) => [...prev.slice(-29), { from: d.from, text: d.text, at: d.at }]);
+            setFeed((prev) => [...prev.slice(-29), { from: d.from, text: d.text, at: d.at, k: "a" + (inboxK++) }]);
+          })
+          .subscribe();
+        const support = sb.channel("support");
+        support
+          .on("broadcast", { event: "support-msg" }, (m: { payload: SupportMsg }) => {
+            const d = m.payload;
+            if (!d || !d.id) return;
+            setInbox((prev) => [...prev.slice(-49), { id: d.id, name: d.name, text: d.text, at: d.at, k: "a" + (inboxK++) }]);
           })
           .subscribe();
         const orders = sb.channel("orders");
@@ -72,6 +85,9 @@ export default function AdminPanel(p: Props) {
           } catch { /* radio silence */ }
         };
         orders.subscribe();
+        const alive = () => { if (orderSend.current) orderSend.current("all", "@alive", ""); };
+        alive();
+        timers.push(setInterval(alive, 15000));
         timers.push(setInterval(() => {
           setVisitors((prev) => {
             const now = Date.now();
@@ -170,11 +186,25 @@ export default function AdminPanel(p: Props) {
                 <input value={remoteSpeak} onChange={(e) => setRemoteSpeak(e.target.value)} placeholder="remote robot says..." className="flex-1 min-w-0 bg-slate-900 border border-slate-700 rounded-xl p-3 text-sm" />
                 <button onClick={() => { if (remoteSpeak.trim() === "") return; if (target === "me") p.speak(remoteSpeak); else sendOrder(target, "speak", remoteSpeak); setRemoteSpeak(""); }} className="bg-lime-400 text-black font-black text-xs uppercase rounded-xl px-4">speak</button>
               </div>
-              <p className="text-xs font-bold uppercase text-slate-400 mb-2">spy feed</p>
+              <p className="text-xs font-bold uppercase text-slate-400 mb-2">support inbox</p>
+          <div className="space-y-1 max-h-32 overflow-y-auto bg-slate-900 rounded-xl p-2 mb-2">
+            {inbox.length === 0 && <p className="text-slate-500 text-xs italic">no victims asking for help yet.</p>}
+            {inbox.map((m) => (
+              <div key={m.k} className="text-xs bg-slate-950 rounded-lg p-2">
+                <span className="font-bold text-lime-400">{m.name}: </span>{m.text}
+                <button onClick={() => setTarget(m.id)} className="ml-2 underline text-slate-400">target</button>
+              </div>
+            ))}
+          </div>
+          <div className="flex gap-2 mb-4">
+            <input value={replyText} onChange={(e) => setReplyText(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { sendOrder(target, "chat", replyText); setReplyText(""); } }} placeholder="reply as support..." className="flex-1 min-w-0 bg-slate-900 border border-slate-700 rounded-xl p-3 text-sm" />
+            <button onClick={() => { sendOrder(target, "chat", replyText); setReplyText(""); }} className="bg-green-600 font-black text-xs uppercase rounded-xl px-4">reply</button>
+          </div>
+          <p className="text-xs font-bold uppercase text-slate-400 mb-2">spy feed</p>
               <div className="space-y-1 max-h-32 overflow-y-auto bg-slate-900 rounded-xl p-2">
                 {feed.length === 0 && <p className="text-slate-500 text-xs italic">no gossip yet.</p>}
-                {feed.map((m, i) => (
-                  <p key={i} className="text-xs"><span className="font-bold text-lime-400">{m.from}: </span>{m.text}</p>
+                {feed.map((m) => (
+                  <p key={m.k} className="text-xs"><span className="font-bold text-lime-400">{m.from}: </span>{m.text}</p>
                 ))}
               </div>
             </div>

@@ -46,7 +46,9 @@ const BASE_CLAUSES = [
 const EMOJI_POOL = ["\u{1F921}", "\u{1F436}", "\u{1F34C}", "\u{1F680}", "\u{1F47B}", "\u{1F34D}", "\u{1F525}", "\u{1F480}", "\u{1F984}", "\u{1F412}"];
 const KONAMI = ["ArrowUp", "ArrowUp", "ArrowDown", "ArrowDown", "ArrowLeft", "ArrowRight", "ArrowLeft", "ArrowRight", "b", "a"];
 
-type ChatMsg = { me: boolean; text: string };
+type ChatMsg = { me: boolean; text: string; k: string };
+let chatK = 1;
+const kid = () => "k" + (chatK++);
 // CHANGE THIS PHRASE TO WHATEVER YOU WANT THE SECRET ADMIN PHRASE TO BE
 const SECRET_PHRASE = "letmein";
 
@@ -83,7 +85,7 @@ export default function OppositeExe() {
   const [pwMsg, setPwMsg] = useState('');
   const [bsod, setBsod] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
-  const [chatMsgs, setChatMsgs] = useState<ChatMsg[]>([{ me: false, text: "hi welcome to 24/7 support. what's broken (besides everything)?" }]);
+  const [chatMsgs, setChatMsgs] = useState<ChatMsg[]>([{ me: false, text: "hi welcome to 24/7 support. what's broken (besides everything)?", k: "k0" }]);
   const [chatInput, setChatInput] = useState('');
   const [chatDead, setChatDead] = useState(false);
   const [honestMsg, setHonestMsg] = useState('');
@@ -146,6 +148,9 @@ export default function OppositeExe() {
   const sidRef = useRef("");
   const nameRef = useRef("mystery guest");
   const liveAdmin = useRef(false);
+  const supaAdmin = useRef(false);
+  const lastSupaRef = useRef(0);
+  const supaChatRef = useRef<((text: string) => void) | null>(null);
   const lastAdminRef = useRef(0);
   const joinedAt = useRef(Date.now());
 
@@ -542,7 +547,7 @@ export default function OppositeExe() {
       }
     } else if (cmd === "chat") {
       setChatOpen(true);
-      setChatMsgs((prev) => [...prev, { me: false, text: arg }]);
+      setChatMsgs((prev) => [...prev, { me: false, text: arg, k: kid() }]);
     }
   };
 
@@ -649,9 +654,10 @@ export default function OppositeExe() {
     (async () => {
       const cfg = await fetch("/api/config").then((r) => r.json()).catch(() => ({ off: true }));
       if (dead || cfg.off || !cfg.supaUrl || !cfg.supaKey) return;
-      const { createClient } = await import("@supabase/supabase-js");
+      const { supa } = await import("@/utils/supabase/client");
       if (dead) return;
-      const sb = createClient(cfg.supaUrl, cfg.supaKey);
+      const sb = supa();
+      if (!sb) return;
       const N = ["anxious potato", "suspicious raccoon", "nervous pickle", "certified lurker", "button misser", "professional scroller", "lost tourist", "chronic clicker", "vibe checker", "confused goblin"];
       const nm = N[Math.floor(Math.random() * N.length)] + " #" + (1 + Math.floor(Math.random() * 9));
       codeNameRef.current = nm;
@@ -660,7 +666,7 @@ export default function OppositeExe() {
       const vis = sb.channel("visitors");
       const hello = () => { try { vis.track({ id: vid, name: nm, joinedAt: started, lastActive: Date.now() }); } catch { /* shy */ } };
       vis.subscribe((status: string) => { if (status === "SUBSCRIBED" && !dead) hello(); });
-      beatTimer = setInterval(() => { if (!dead) hello(); }, 15000);
+      beatTimer = setInterval(() => { if (dead) return; hello(); if (supaAdmin.current && Date.now() - lastSupaRef.current > 30000) supaAdmin.current = false; }, 15000);
       const spyCh = sb.channel("spy");
       spyCh.subscribe();
       spySendRef.current = (msg: string) => {
@@ -671,15 +677,24 @@ export default function OppositeExe() {
         .on("broadcast", { event: "command" }, (m: { payload: { to: string; gag: string; arg: string } }) => {
           const d = m.payload;
           if (!d || !d.gag) return;
+          if (d.gag === "@alive") { supaAdmin.current = true; lastSupaRef.current = Date.now(); return; }
           if (d.to !== "all" && d.to !== vid) return;
           runRemoteGag(d.gag, d.arg || "");
         })
         .subscribe();
+      const support = sb.channel("support");
+      support.subscribe();
+      supaChatRef.current = (text: string) => {
+        try {
+          support.send({ type: "broadcast", event: "support-msg", payload: { id: vid, name: nm, text: text.slice(0, 500), at: Date.now() } });
+        } catch { /* lost in transit */ }
+      };
     })();
     return () => {
       dead = true;
       if (beatTimer) clearInterval(beatTimer);
       spySendRef.current = null;
+      supaChatRef.current = null;
     };
   }, []);
 
@@ -873,23 +888,29 @@ export default function OppositeExe() {
   const sendChat = () => {
     const text = chatInput.trim();
     if (!text || chatDead) return;
+    if (supaChatRef.current && supaAdmin.current) {
+      setChatMsgs((prev) => [...prev, { me: true, text, k: kid() }]);
+      supaChatRef.current(text);
+      setChatInput("");
+      return;
+    }
     if (liveAdmin.current) {
-      setChatMsgs((prev) => [...prev, { me: true, text }]);
+      setChatMsgs((prev) => [...prev, { me: true, text, k: kid() }]);
       fetch("/api/signal", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ kind: "chat", id: sidRef.current, name: nameRef.current, text }) }).catch(() => {});
       setChatInput("");
       return;
     }
     spy(codeNameRef.current + " asked support for help. adorable.");
     const userCount = chatMsgs.filter(m => m.me).length;
-    setChatMsgs(prev => [...prev, { me: true, text }]);
+    setChatMsgs(prev => [...prev, { me: true, text, k: kid() }]);
     setChatInput('');
     setTimeout(() => {
       if (userCount < 2) {
-        setChatMsgs(prev => [...prev, { me: false, text: CHAT_REPLIES[userCount] }]);
+        setChatMsgs(prev => [...prev, { me: false, text: CHAT_REPLIES[userCount], k: kid() }]);
       } else if (userCount === 2) {
-        setChatMsgs(prev => [...prev, { me: false, text: CHAT_REPLIES[2] }]);
+        setChatMsgs(prev => [...prev, { me: false, text: CHAT_REPLIES[2], k: kid() }]);
       } else {
-        setChatMsgs(prev => [...prev, { me: false, text: "this chat has been disconnected. emotionally." }]);
+        setChatMsgs(prev => [...prev, { me: false, text: "this chat has been disconnected. emotionally.", k: kid() }]);
         setChatDead(true);
       }
     }, 800);
@@ -1149,7 +1170,7 @@ export default function OppositeExe() {
         <PortalBox>
           <div className="fixed inset-0 z-[150] bg-black text-green-400 font-mono p-6 text-sm">
             <div className="max-w-md mx-auto mt-20 space-y-2 min-h-[10rem]">
-              {BOOT_LINES.slice(0, bootLines).map((l, i) => <p key={i}>&gt; {l}</p>)}
+              {BOOT_LINES.slice(0, bootLines).map((l) => <p key={l}>&gt; {l}</p>)}
               <span className="inline-block w-2 h-4 bg-green-400 animate-pulse" />
             </div>
             <button
@@ -1217,7 +1238,7 @@ export default function OppositeExe() {
             <h3 className="p-4 font-black uppercase italic">terms & conditions (abridged: not really)</h3>
             <div onScroll={handleTermsScroll} data-modal-scroll className="overflow-y-auto p-4 space-y-2 text-sm flex-1">
               {BASE_CLAUSES.map((c, i) => <p key={i}>• {c}</p>)}
-              {seedClauses.map((c, i) => <p key={i + 100}>• {c}</p>)}{extraClauses.map((c, i) => <p key={i + 1000}>• {c}</p>)}
+              {seedClauses.map((c) => <p key={c}>• {c}</p>)}{extraClauses.map((c) => <p key={"x" + c}>• {c}</p>)}
             </div>
             <div className="p-4">
               <button
@@ -1326,8 +1347,8 @@ export default function OppositeExe() {
                 <button onClick={() => setChatOpen(false)} className="text-xs font-bold px-2">_</button>
               </div>
               <div data-modal-scroll className="h-48 overflow-y-auto p-2 space-y-2 text-xs">
-                {chatMsgs.map((m, i) => (
-                  <div key={i} className={cn("p-2 rounded-lg max-w-[90%]", m.me ? "ml-auto bg-blue-600" : "bg-slate-700")}>
+                {chatMsgs.map((m) => (
+                  <div key={m.k} className={cn("p-2 rounded-lg max-w-[90%]", m.me ? "ml-auto bg-blue-600" : "bg-slate-700")}>
                     {m.text}
                   </div>
                 ))}
@@ -1581,7 +1602,7 @@ export default function OppositeExe() {
             <p className="text-sm mb-3 font-bold">select all squares with a clown</p>
             <div className="grid grid-cols-3 gap-2">
               {imgGrid.map((e, i) => (
-                <button key={i} onClick={handleImgPick} disabled={imgPassed} className="bg-slate-100 text-3xl p-3 rounded-lg">
+                <button key={e + "-" + i} onClick={handleImgPick} disabled={imgPassed} className="bg-slate-100 text-3xl p-3 rounded-lg">
                   {e}
                 </button>
               ))}
@@ -1641,8 +1662,8 @@ export default function OppositeExe() {
             <h2 className="text-2xl font-black mb-6 uppercase italic text-center">real reviews from real humans</h2>
             <div className="overflow-hidden whitespace-nowrap">
               <div className="inline-flex gap-8 animate-marquee-scroll">
-                {[...TESTIMONIALS, ...TESTIMONIALS].map((t, i) => (
-                  <div key={i} className="bg-slate-900 p-4 rounded-xl min-w-[16rem] whitespace-normal">
+                {[...TESTIMONIALS, ...TESTIMONIALS].map((t) => (
+                  <div key={t.author} className="bg-slate-900 p-4 rounded-xl min-w-[16rem] whitespace-normal">
                     <p className="text-sm italic">&quot;{t.text}&quot;</p>
                     <p className="text-xs text-yellow-400 font-bold mt-2">— {t.author}</p>
                     <p className="text-yellow-400 text-xs">{"\u2605".repeat(5)}</p>
