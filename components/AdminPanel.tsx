@@ -238,6 +238,7 @@ export default function AdminPanel(p: Props) {
                 <p className="flex items-center gap-2 font-black mb-1">
                   {list.length > 0 ? (<><span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" /><span>{list.length} victims online</span></>) : (<span className="text-slate-500">nobody. sad.</span>)}
                 </p>
+                {rts.st === "connected" && list.length <= 1 && (<p className="text-xs italic text-slate-500 mt-1">only you. lonely.</p>)}
                 <button onClick={() => setExpanded(expanded === "all" ? null : "all")} className="w-full bg-red-900 rounded-xl p-2 text-xs font-black uppercase mb-2">fire at everyone {expanded === "all" ? "-" : "+"}</button>
                 {expanded === "all" && fireMenu("all")}
                 <div className="space-y-2 mt-2 max-h-64 overflow-y-auto overscroll-contain">
