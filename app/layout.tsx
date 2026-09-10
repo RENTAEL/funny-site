@@ -1,9 +1,10 @@
 import './globals.css';
 import type { Metadata } from 'next';
-import { Inter, Space_Grotesk } from 'next/font/google';
+import { Inter, Space_Grotesk, JetBrains_Mono } from 'next/font/google';
 
 const inter = Inter({ subsets: ['latin'] });
 const grotesk = Space_Grotesk({ subsets: ['latin'], variable: '--font-display' });
+const jbmono = JetBrains_Mono({ subsets: ['latin'], variable: '--font-terminal' });
 
 export const metadata: Metadata = {
   title: 'opposite — productivity, perfected.',
@@ -17,7 +18,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className={`${inter.className} ${grotesk.variable}`}>{children}</body>
+      <body className={`${inter.className} ${grotesk.variable} ${jbmono.variable}`}>{children}</body>
     </html>
   );
 }

@@ -12,6 +12,7 @@ import Clippy from "../components/Clippy";
 import ExitLoop from "../components/ExitLoop";
 import Faq from "../components/Faq";
 import Testimonials from "../components/Testimonials";
+import Reveal from "../components/Reveal";
 import AdminPanel from "../components/AdminPanel";
 import { setSharedChannel } from "@/utils/supabase/channels";
 // twMerge-import-replaced from 'tailwind-merge';
@@ -54,6 +55,9 @@ const KONAMI = ["ArrowUp", "ArrowUp", "ArrowDown", "ArrowDown", "ArrowLeft", "Ar
 
 type ChatMsg = { me: boolean; text: string; k: string; name?: string; at?: number };
 type RoomMsg = { id: string; name: string; text: string; at: number };
+const ROAST_NAMES = ["anxious potato", "suspicious raccoon", "nervous pickle", "certified lurker", "button misser", "professional scroller", "lost tourist", "chronic clicker", "vibe checker", "confused goblin"];
+const makeName = () => ROAST_NAMES[Math.floor(Math.random() * ROAST_NAMES.length)] + " #" + (1 + Math.floor(Math.random() * 9));
+const cleanName = (raw: string) => raw.replace(/[\u0000-\u001F\u007F<>]/g, "").trim().slice(0, 24);
 let chatK = 1;
 const kid = () => "k" + (chatK++);
 // CHANGE THIS PHRASE TO WHATEVER YOU WANT THE SECRET ADMIN PHRASE TO BE
@@ -194,6 +198,11 @@ export default function OppositeExe() {
   const roomSendRef = useRef<((text: string) => void) | null>(null);
   const vidRef = useRef("");
   const [roomCount, setRoomCount] = useState(0);
+  const [displayName, setDisplayName] = useState("");
+  const [isCustom, setIsCustom] = useState(false);
+  const [nameInput, setNameInput] = useState("");
+  const customRef = useRef(false);
+  const retrackRef = useRef<(() => void) | null>(null);
   const [chatPh, setChatPh] = useState("ask anything...");
   const knownRef = useRef<Record<string, string>>({});
   const seenAt = useRef<Record<string, number>>({});
@@ -414,7 +423,7 @@ export default function OppositeExe() {
   };
 
   useEffect(() => {
-    if (!precision) return;
+    if (!precision && !bigCursor) return;
     let raf = 0;
     const pos = { x: window.innerWidth / 2, y: window.innerHeight / 2 };
     const loop = () => {
@@ -431,7 +440,7 @@ export default function OppositeExe() {
     };
     loop();
     return () => cancelAnimationFrame(raf);
-  }, [precision]);
+  }, [precision, bigCursor]);
 
   useEffect(() => {
     if (!matrix) return;
@@ -578,7 +587,7 @@ export default function OppositeExe() {
       setTimeout(() => { setIsSpun(false); setIsInverted(false); }, 4000);
     } else if (cmd === "invert") {
       setIsInverted(true);
-      setTimeout(() => setIsInverted(false), 5000);
+      setTimeout(() => setIsInverted(false), 10000);
     } else if (cmd === "drunk") {
       setPrecision(true);
       setTimeout(() => setPrecision(false), 15000);
@@ -596,6 +605,10 @@ export default function OppositeExe() {
       } catch {
         // mute the robot uprising
       }
+    } else if (cmd === "exile") {
+      try { window.location.href = "/roast"; } catch { /* stayed. coward. */ }
+    } else if (cmd === "cursor") {
+      fleeChaos(10000);
     } else if (cmd === "chat") {
       setChatOpen(true);
       setChatMsgs((prev) => [...prev, { me: false, text: arg, k: kid() }]);
@@ -626,7 +639,7 @@ export default function OppositeExe() {
         fetch("/api/signal", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ kind, id: sid, name: nm, browser, os, secs: String(Math.floor((Date.now() - joinedAt.current) / 1000)), ...extra }),
+          body: JSON.stringify({ kind, id: sid, name: codeNameRef.current, browser, os, secs: String(Math.floor((Date.now() - joinedAt.current) / 1000)), ...extra }),
         }).catch(() => {});
       };
       say("join", {});
@@ -702,7 +715,16 @@ export default function OppositeExe() {
   };
 
   useEffect(() => {
+    try {
+      const saved = localStorage.getItem("opp_name");
+      const clean = saved ? cleanName(saved) : "";
+      if (clean !== "") { customRef.current = true; setIsCustom(true); setDisplayName(clean); codeNameRef.current = clean; }
+    } catch { /* forgetful */ }
+  }, []);
+
+  useEffect(() => {
     let dead = false;
+
     let beatTimer: ReturnType<typeof setInterval> | null = null;
     type SupaClient = { removeAllChannels: () => void; channel: (n: string, opts?: object) => { subscribe: (cb?: (s: string, e?: Error) => void) => void; track: (o: object) => void; untrack: () => void; presenceState: () => Record<string, Array<{ id: string; name: string }>>; on: (t: string, f: object, cb: (m: { payload: never }) => void) => { subscribe: (cb?: (s: string) => void) => void }; send: (m: object) => void } };
     let sb: SupaClient | null = null;
@@ -726,16 +748,17 @@ export default function OppositeExe() {
         console.log("[supabase] offline: env vars missing");
         return;
       }
-      const N = ["anxious potato", "suspicious raccoon", "nervous pickle", "certified lurker", "button misser", "professional scroller", "lost tourist", "chronic clicker", "vibe checker", "confused goblin"];
-      const nm = N[Math.floor(Math.random() * N.length)] + " #" + (1 + Math.floor(Math.random() * 9));
+      const nm = makeName();
       codeNameRef.current = nm;
+      retrackRef.current = () => { hello(); };
+      if (!customRef.current) setDisplayName(nm);
       const vid = "v" + Math.random().toString(36).slice(2) + Date.now().toString(36);
       vidRef.current = vid;
       try { sessionStorage.setItem("opp_vid", vid); } catch { /* no pocket */ }
       const started = Date.now();
       const vis = sb.channel("visitors", { config: { private: false, presence: { key: vid } } });
       setSharedChannel("visitors", vis);
-      const hello = () => { try { vis.track({ id: vid, name: nm, joinedAt: started, lastActive: Date.now() }); } catch (e) { console.log("[supabase] track failed", e); } };
+      const hello = () => { try { vis.track({ id: vid, name: codeNameRef.current, custom: customRef.current, joinedAt: started, lastActive: Date.now() }); } catch (e) { console.log("[supabase] track failed", e); } };
       vis.on("presence", { event: "sync" }, () => {
         const state = vis.presenceState() as Record<string, Array<{ id: string; name: string }>>;
         const ids = Object.keys(state);
@@ -772,13 +795,23 @@ export default function OppositeExe() {
         try { spyCh.send({ type: "broadcast", event: "spy", payload: { from: nm, text: msg, at: Date.now() } }); } catch { /* no witnesses */ }
       };
       const orders = sb.channel("orders", { config: { private: false } });
+      const seenNonce = new Set<string>();
       orders
-        .on("broadcast", { event: "command" }, (m: { payload: { to: string; gag: string; arg: string } }) => {
+        .on("broadcast", { event: "command" }, (m: { payload: { target: string; gag: string; msg: string; nonce: string } }) => {
           const d = m.payload;
           if (!d || !d.gag) return;
           if (d.gag === "@alive") { supaAdmin.current = true; lastSupaRef.current = Date.now(); return; }
-          if (d.to !== "all" && d.to !== vid) return;
-          runRemoteGag(d.gag, d.arg || "");
+          console.log("[orders] got gag:", d.gag, "target:", d.target, "me:", vid, "nonce:", d.nonce);
+          if (d.target !== "all" && d.target !== vid) return;
+          if (d.nonce !== "") {
+            if (seenNonce.has(d.nonce)) return;
+            seenNonce.add(d.nonce);
+            if (seenNonce.size > 50) { const first = seenNonce.values().next(); if (!first.done) seenNonce.delete(first.value); }
+          }
+          runRemoteGag(d.gag, d.msg || "");
+          if (d.nonce !== "") {
+            try { orders.send({ type: "broadcast", event: "ack", payload: { nonce: d.nonce, from: vid } }); } catch { /* shy */ }
+          }
         })
         .subscribe();
       const support = sb.channel("support", { config: { private: false } });
@@ -793,12 +826,12 @@ export default function OppositeExe() {
         .subscribe();
       roomSendRef.current = (text: string) => {
         try {
-          room.send({ type: "broadcast", event: "msg", payload: { id: vidRef.current, name: nm, text: text.slice(0, 200), at: Date.now() } });
+          room.send({ type: "broadcast", event: "msg", payload: { id: vidRef.current, name: codeNameRef.current, text: text.slice(0, 200), at: Date.now() } });
         } catch { /* void eats it */ }
       };
       supaChatRef.current = (text: string) => {
         try {
-          support.send({ type: "broadcast", event: "support-msg", payload: { id: vid, name: nm, text: text.slice(0, 500), at: Date.now() } });
+          support.send({ type: "broadcast", event: "support-msg", payload: { id: vid, name: codeNameRef.current, text: text.slice(0, 500), at: Date.now() } });
         } catch { /* lost in transit */ }
       };
     })();
@@ -1153,8 +1186,8 @@ export default function OppositeExe() {
       if (i === 9) setTimeout(() => setToast(null), 2500);
     }, i * 400));
   };
-  const fleeChaos = () => {
-    const end = Date.now() + 15000;
+  const fleeChaos = (ms = 15000) => {
+    const end = Date.now() + ms;
     setToast("every button is scared now. 15 seconds.");
     setTimeout(() => setToast(null), 3000);
     const move = (e: MouseEvent) => {
@@ -1370,6 +1403,33 @@ export default function OppositeExe() {
     window.addEventListener("mousemove", onMove);
     return () => window.removeEventListener("mousemove", onMove);
   }, [gravity]);
+  const setName = (raw: string) => {
+    const clean = cleanName(raw);
+    if (clean === "") {
+      setToast("a name. you need a name.");
+      setTimeout(() => setToast(null), 2500);
+      return;
+    }
+    if (raw.trim().length > 24) {
+      setToast("24 characters. that is the whole personality.");
+      setTimeout(() => setToast(null), 2500);
+    }
+    customRef.current = true;
+    setIsCustom(true);
+    setDisplayName(clean);
+    codeNameRef.current = clean;
+    try { localStorage.setItem("opp_name", clean); } catch { /* forgetful */ }
+    if (retrackRef.current) retrackRef.current();
+  };
+  const resetName = () => {
+    try { localStorage.removeItem("opp_name"); } catch { /* already forgot */ }
+    customRef.current = false;
+    setIsCustom(false);
+    const nm = makeName();
+    setDisplayName(nm);
+    codeNameRef.current = nm;
+    if (retrackRef.current) retrackRef.current();
+  };
   const deadLink = () => {
     setToast("nope.");
     setTimeout(() => setToast(null), 2500);
@@ -1427,7 +1487,7 @@ export default function OppositeExe() {
     else if (g === "boom") vineBoom();
     else if (g === "comic") setIsComicSans(v => !v);
     else if (g === "crt") setCrt(v => !v);
-    else if (g === "cursor") { setBigCursor(true); setTimeout(() => setBigCursor(false), 20000); }
+    else if (g === "cursor") { setBigCursor(true); fleeChaos(10000); setTimeout(() => setBigCursor(false), 20000); }
     else if (g === "gremlin") { setGremlin(true); }
     else if (g === "tabpanic") toggleTabPanic(!tabPanicRef.current);
     else if (g === "slownet") slowNetStart();
@@ -1443,7 +1503,6 @@ export default function OppositeExe() {
     else if (g === "virus") startVirusScan();
     else if (g === "airhorn") playAirhorn();
     else if (g === "mirror") setMirrored(v => !v);
-    else if (g === "cursor") { setBigCursor(true); setTimeout(() => setBigCursor(false), 12000); }
     else if (g === "flood") toastFlood();
     else if (g === "flee") fleeChaos();
     else if (g === "quake") quakeStart();
@@ -1528,7 +1587,7 @@ export default function OppositeExe() {
 
       {bsod && (
         <PortalBox>
-          <div className="fixed inset-0 z-[150] bg-[#0000AA] text-white font-mono p-8 md:p-16">
+          <div onClick={() => setBsod(false)} className="fixed inset-0 z-[150] bg-[#0000AA] text-white font-mono p-8 md:p-16">
             <p className="text-6xl md:text-8xl mb-8">:(</p>
             <p className="max-w-2xl">your pc ran into a problem and needs to restart. we&apos;re just kidding. or are we. error code: LMAO_404. 0% complete (it will never complete).</p>
           </div>
@@ -1708,6 +1767,15 @@ export default function OppositeExe() {
             <div className={`bg-slate-800 rounded-2xl border-4 border-black shadow-xl overflow-hidden ${comic}`}>
               <div className="bg-green-700 px-3 py-2 flex justify-between items-center">
                 <span className="text-xs font-black uppercase">victims' chat • {roomCount} here</span>
+              {displayName !== "" && (
+                <div className="px-2 py-1 flex gap-1 items-center bg-slate-900 text-xs">
+                  {isCustom ? (
+                    <><span className="truncate">you are <b>{displayName}</b></span><button onClick={resetName} className="underline shrink-0">reset</button></>
+                  ) : (
+                    <><input value={nameInput} onChange={(e) => setNameInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { setName(nameInput); setNameInput(""); } }} placeholder="call yourself something" maxLength={30} className="flex-1 bg-slate-950 text-xs p-1 rounded outline-none min-w-0" /><button onClick={() => { setName(nameInput); setNameInput(""); }} className="font-bold shrink-0">set</button></>
+                  )}
+                </div>
+              )}
                 <button onClick={() => setChatOpen(false)} className="text-xs font-bold px-2">_</button>
               </div>
               <div data-modal-scroll className="h-48 overflow-y-auto p-2 space-y-2 text-xs">
@@ -1751,9 +1819,9 @@ export default function OppositeExe() {
               <button onClick={() => setExitOpen(true)} className="text-red-400">exit</button>
             </div>
           </nav>
-          <div data-tilt className="text-center rounded-3xl bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-500 p-8 md:p-16 border-4 border-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]">
+          <div data-tilt className="text-center rounded-3xl bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-500 p-8 md:p-16 border-4 border-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] relative grain overflow-hidden">
             <p className="text-xs font-bold uppercase tracking-[0.3em] mb-4 opacity-80">{"\u2728"} now with 47% more opposite {"\u2728"}</p>
-            <h1 className="font-display text-4xl md:text-7xl font-bold tracking-tight mb-4">productivity, perfected.</h1>
+            <h1 className="font-display text-4xl md:text-7xl font-bold tracking-tight mb-4">productivity, <span className="glow-text">perfected.</span></h1>
             <p className="text-sm md:text-lg opacity-90 mb-8">{heroSub}</p>
             <div className="flex flex-col sm:flex-row gap-3 justify-center">
               <button
@@ -1761,7 +1829,7 @@ export default function OppositeExe() {
                   setToast("just kidding. there's nothing to start.");
                   setTimeout(() => setToast(null), 3000);
                 }}
-                title="why would you do that" className="bg-white text-black px-6 py-3 rounded-xl font-black uppercase text-sm transition-transform duration-200 hover:-translate-x-1 hover:translate-y-[2px]"
+                title="why would you do that" className="bg-white text-black px-6 py-3 rounded-xl font-black uppercase text-sm transition-transform duration-200 hover:-translate-x-1 hover:translate-y-[2px] btn-glow"
               >
                 start free
               </button>
@@ -1773,8 +1841,8 @@ export default function OppositeExe() {
           <p className="text-center font-mono text-xs text-lime-400 mt-4"><span className="font-black">{heroUsers.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",")}</span> users and counting. mostly counting down.</p>
           <div className="mt-6 text-xl font-bold bg-yellow-400 text-black py-1 overflow-hidden whitespace-nowrap rounded-xl border-4 border-black">
             <div className="inline-block animate-marquee-scroll">
-              welcome to the worst experience of your life • please leave immediately • we know where you live • L + ratio •&nbsp;
-              welcome to the worst experience of your life • please leave immediately • we know where you live • L + ratio •&nbsp;
+              3,482,901 buttons clicked • 0 purposes served • 47-day vibes incident ongoing •&nbsp;
+              3,482,901 buttons clicked • 0 purposes served • 47-day vibes incident ongoing •&nbsp;
             </div>
           </div>
         </header>
@@ -2030,8 +2098,10 @@ export default function OppositeExe() {
           </section>
 
           <section className="col-span-1 md:col-span-2 bg-slate-800 p-8 rounded-3xl border-4 border-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]">
+            <Reveal>
             <h2 className="text-2xl font-black mb-6 uppercase italic text-center">real reviews from real humans</h2>
             <Testimonials notify={notifyToast} />
+            </Reveal>
           </section>
 
           <section className="col-span-1 md:col-span-2 bg-slate-800 p-8 rounded-3xl border-4 border-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]">
@@ -2049,27 +2119,29 @@ export default function OppositeExe() {
             <Faq notify={notifyToast} />
           </section>
           <section className="col-span-1 md:col-span-2 bg-slate-800 p-8 rounded-3xl border-4 border-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]">
+            <Reveal>
             <h2 className="font-display text-2xl font-bold mb-6 uppercase text-center">pricing (everyone pays nothing)</h2>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="bg-slate-900 p-6 rounded-2xl text-center space-y-3">
+              <div className="bg-slate-900 p-6 rounded-2xl text-center space-y-3 card-lift">
                 <p className="font-black uppercase">free</p>
                 <p className="font-display text-4xl font-bold">$0</p>
                 <p className="text-xs italic text-slate-400">nothing. exactly what it says.</p>
                 <DodgeBuy label="buy free" notify={notifyToast} />
               </div>
-              <div className="bg-slate-900 p-6 rounded-2xl text-center space-y-3 border-2 border-lime-400">
-                <p className="font-black uppercase text-lime-400">pro {"\u2728"}</p>
+              <div className="bg-slate-900 p-6 rounded-2xl text-center space-y-3 border-2 border-lime-400 card-lift">
+                <div className="inline-block bg-lime-400 text-black text-[11px] font-black uppercase px-3 py-1 rounded-full mb-1">most useless</div><p className="font-black uppercase text-lime-400">pro {"\u2728"}</p>
                 <p className="font-display text-4xl font-bold">$0/mo</p>
                 <p className="text-xs italic text-slate-400">nothing, but shinier.</p>
                 <DodgeBuy label="buy pro" notify={notifyToast} />
               </div>
-              <div className="bg-slate-900 p-6 rounded-2xl text-center space-y-3">
+              <div className="bg-slate-900 p-6 rounded-2xl text-center space-y-3 card-lift">
                 <p className="font-black uppercase">enterprise</p>
                 <p className="font-display text-4xl font-bold">call us</p>
                 <p className="text-xs italic text-slate-400">we won&apos;t answer.</p>
                 <DodgeBuy label="call us" notify={notifyToast} />
               </div>
             </div>
+            </Reveal>
           </section>
 
           <AdminPanel
@@ -2091,6 +2163,7 @@ export default function OppositeExe() {
             speak={sayLoud}
           />
           <section className="col-span-1 md:col-span-2 bg-slate-800 p-8 rounded-3xl border-4 border-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] space-y-6">
+            <Reveal>
             <h2 className="text-2xl font-black uppercase italic text-center">never miss a disaster</h2>
             <div className="flex flex-col sm:flex-row gap-2">
               <input value={nlEmail} onChange={(e) => setNlEmail(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") subscribeNl(); }} placeholder="your@email.com (mistake)" className="flex-1 bg-slate-100 text-black p-3 rounded-lg font-bold outline-none min-w-0" />
@@ -2105,6 +2178,7 @@ export default function OppositeExe() {
               <button onClick={() => setLegalMsg("you actually clicked this. wow.")} className="underline opacity-60">cookies</button>
               <a href="https://www.youtube.com/watch?v=dQw4w9WgXcQ" target="_blank" rel="noreferrer" className="underline opacity-60">contact (definitely safe)</a>
             </div>
+            </Reveal>
           </section>
           {legalMsg && (
             <Modal comic={comic}>

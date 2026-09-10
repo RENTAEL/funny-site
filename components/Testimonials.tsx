@@ -20,7 +20,7 @@ export default function Testimonials({ notify }: { notify: (msg: string) => void
     <div
       onMouseEnter={() => { setPaused(true); notify("oh NOW you want to read them"); }}
       onMouseLeave={() => setPaused(false)}
-      className="bg-slate-900 p-6 rounded-2xl text-center min-h-[12rem] flex flex-col justify-center"
+      className="bg-slate-900 p-6 rounded-2xl text-center min-h-[12rem] flex flex-col justify-center card-lift"
     >
       <p className="text-yellow-400 text-xs">{"*".repeat(5)}</p>
       <p className="text-lg italic mt-2">"{r.text}"</p>

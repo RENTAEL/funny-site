@@ -21,12 +21,12 @@ type Props = {
   onTypeText: (msg: string) => void;
   onScrollPrison: () => void;
 };
-type Visitor = { id: string; name: string; joinedAt: number; lastActive: number };
+type Visitor = { id: string; name: string; joinedAt: number; lastActive: number; custom?: boolean };
 type SharedVis = { presenceState: () => Record<string, Visitor[]> };
 type SpyMsg = { from: string; text: string; at: number; k: string };
 type SupportMsg = { id: string; name: string; text: string; at: number; k: string };
 let inboxK = 1;
-const GAGS = ["spin", "invert", "gravity", "drunk", "bsod", "update", "virus", "confetti", "boom", "airhorn", "comic", "crt", "mirror", "cursor", "flood", "flee", "quake", "lights", "tabpanic", "slownet", "popups", "rain", "clippy", "autopilot", "shake", "judgment", "audience", "magnet", "butter"];
+const GAGS = ["spin", "invert", "gravity", "drunk", "bsod", "update", "virus", "confetti", "boom", "airhorn", "comic", "crt", "mirror", "cursor", "flood", "flee", "quake", "lights", "tabpanic", "slownet", "popups", "rain", "clippy", "autopilot", "shake", "judgment", "audience", "magnet", "butter", "exile", "cursor"];
 function rel(ts: number, now: number) {
   const s = Math.max(0, Math.floor((now - ts) / 1000));
   if (s < 5) return "just now";
@@ -61,6 +61,7 @@ export default function AdminPanel(p: Props) {
   const [inbox, setInbox] = useState<SupportMsg[]>([]);
   const [replyText, setReplyText] = useState("");
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [fireLog, setFireLog] = useState<Array<{ nonce: string; text: string; at: number; ok: boolean }>>([]);
   const [fled, setFled] = useState<Record<string, { name: string; at: number }>>({});
   const [flashId, setFlashId] = useState<string | null>(null);
   const [folded, setFolded] = useState(false);
@@ -69,7 +70,7 @@ export default function AdminPanel(p: Props) {
   const [remoteSpeak, setRemoteSpeak] = useState("");
   const [tick, setTick] = useState(0);
   const countsRef = useRef<Record<string, number>>({});
-  const orderSend = useRef<((to: string, gag: string, arg: string) => void) | null>(null);
+  const orderSend = useRef<((to: string, gag: string, arg: string, nonce: string) => void) | null>(null);
   const stagesRef = useRef<string[]>([]);
   const stage = (s: string) => { stagesRef.current.push(new Date().toLocaleTimeString() + " " + s); };
   const [showReport, setShowReport] = useState(false);
@@ -135,6 +136,12 @@ export default function AdminPanel(p: Props) {
             const v = state[k][0];
             if (v && v.id) next[v.id] = v;
           });
+          Object.keys(next).forEach((id) => {
+            const old = vref.current[id];
+            if (old && old.name !== next[id].name) {
+              setFeed((prevf) => [...prevf.slice(-29), { from: "mission control", text: old.name + " is now " + next[id].name, at: Date.now(), k: "a" + (inboxK++) }]);
+            }
+          });
           const prev = vref.current;
           Object.keys(next).forEach((id) => {
             if (!prev[id]) {
@@ -186,12 +193,18 @@ export default function AdminPanel(p: Props) {
         console.log('[stage] creating channel', { name: 'orders' });
         stage("creating channel orders");
         const orders = sb.channel("orders", { config: { private: false } });
-        orderSend.current = (to: string, gag: string, arg: string) => {
+        orderSend.current = (to: string, gag: string, arg: string, nonce: string) => {
           try {
-            orders.send({ type: "broadcast", event: "command", payload: { to, gag, arg } });
+            orders.send({ type: "broadcast", event: "command", payload: { target: to, gag: gag, msg: arg, nonce: nonce } });
           } catch { /* radio silence */ }
         };
-        orders.subscribe();
+        orders
+          .on("broadcast", { event: "ack" }, (m: { payload: { nonce: string } }) => {
+            const d = m.payload;
+            if (!d || !d.nonce) return;
+            setFireLog((prev) => prev.map((fl) => (fl.nonce === d.nonce ? { ...fl, ok: true } : fl)));
+          })
+          .subscribe();
         console.log('[stage] handlers registered: broadcast spy, broadcast support-msg, broadcast command');
         stage("handlers registered: spy, support, orders");
         console.log('[stage] channel created');
@@ -202,7 +215,7 @@ export default function AdminPanel(p: Props) {
           stage("SETUP THREW: " + e.message);
           setRts({ st: "offline", reason: "setup threw" });
         }
-        const alive = () => { if (orderSend.current) orderSend.current("all", "@alive", ""); };
+        const alive = () => { if (orderSend.current) orderSend.current("all", "@alive", "", ""); };
         alive();
         timers.push(setInterval(alive, 15000));
         timers.push(setInterval(() => {
@@ -230,7 +243,11 @@ export default function AdminPanel(p: Props) {
     };
   }, [p.open]);
   const sendOrder = (to: string, gag: string, arg: string) => {
-    if (orderSend.current) orderSend.current(to, gag, arg);
+    const nonce = "n" + Date.now().toString(36) + Math.floor(Math.random() * 1e6).toString(36);
+    if (orderSend.current) orderSend.current(to, gag, arg, nonce);
+    const nm = to === "all" ? "EVERYONE" : (vref.current[to] ? vref.current[to].name : to);
+    setFireLog((prev) => [...prev.slice(-19), { nonce: nonce, text: "fired " + gag + " at " + nm, at: Date.now(), ok: false }]);
+    setTimeout(() => { setFireLog((prev) => prev.map((fl) => (fl.nonce === nonce && !fl.ok ? { ...fl, text: fl.text + " -- no confirmation, target may have fled" } : fl))); }, 8000);
     if (to === "all") {
       Object.keys(vref.current).forEach((id) => { countsRef.current[id] = (countsRef.current[id] || 0) + 1; });
     } else if (vref.current[to]) {
@@ -265,23 +282,27 @@ export default function AdminPanel(p: Props) {
   const now = Date.now();
   const list = Object.keys(visitors).map((id) => visitors[id]);
   const fledList = Object.keys(fled).map((id) => ({ id, name: fled[id].name }));
-  const fireMenu = (id: string) => (
-    <div className="mt-2 bg-black rounded-xl p-2">
+  const fireMenu = (id: string) => {
+    const nm = id === "all" ? "EVERYONE" : (vref.current[id] ? vref.current[id].name : id);
+    return (
+    <div data-testid="remote-menu" className="mt-2 bg-black rounded-xl p-2">
+      <p className="text-[11px] font-black text-red-400 mb-2">TARGET LOCKED: {nm}</p>
       <div className="grid grid-cols-3 gap-1 mb-2">
         {GAGS.map((g) => (
-          <button key={g} onClick={() => remoteGag(id, g)} className="bg-slate-800 rounded-lg p-2 text-[11px] font-black uppercase">{g}</button>
+          <button key={g} onClick={() => remoteGag(id, g)} className="bg-slate-800 rounded-lg p-2 text-[11px] font-black uppercase danger-hover">{g}</button>
         ))}
       </div>
       <div className="flex gap-1 mb-1">
-        <input value={remoteToast} onChange={(e) => setRemoteToast(e.target.value)} placeholder="toast them..." className="flex-1 min-w-0 bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs" />
+        <input data-testid="remote-toast" value={remoteToast} onChange={(e) => setRemoteToast(e.target.value)} placeholder="toast them..." className="flex-1 min-w-0 bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs" />
         <button onClick={() => { if (remoteToast.trim() === "") return; sendOrder(id, "toast", remoteToast); setRemoteToast(""); }} className="bg-lime-400 text-black font-black text-[11px] uppercase rounded-lg px-3">send</button>
       </div>
       <div className="flex gap-1">
-        <input value={remoteSpeak} onChange={(e) => setRemoteSpeak(e.target.value)} placeholder="robot says..." className="flex-1 min-w-0 bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs" />
+        <input data-testid="remote-speak" value={remoteSpeak} onChange={(e) => setRemoteSpeak(e.target.value)} placeholder="robot says..." className="flex-1 min-w-0 bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs" />
         <button onClick={() => { if (remoteSpeak.trim() === "") return; sendOrder(id, "speak", remoteSpeak); setRemoteSpeak(""); }} className="bg-lime-400 text-black font-black text-[11px] uppercase rounded-lg px-3">speak</button>
       </div>
     </div>
-  );
+    );
+  };
   if (folded) {
     return (
       <PortalBox>
@@ -307,7 +328,7 @@ export default function AdminPanel(p: Props) {
               {rts.st === "connected" ? (<><span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" /><span>realtime: connected</span></>) : rts.st === "connecting" ? (<><span className="w-2 h-2 rounded-full bg-yellow-500 animate-pulse" /><span>realtime: connecting...</span></>) : (<><span className="w-2 h-2 rounded-full bg-red-500" /><span>realtime: offline{rts.reason !== "" ? ": " + rts.reason : ""}</span></>)}
             </p>
             <button onClick={copyReport} className="w-full bg-slate-800 rounded-xl p-2 text-xs font-black uppercase mb-2">copy debug report</button>
-            {showReport && (<pre className="text-[11px] bg-black rounded-xl p-2 mb-2 overflow-x-auto whitespace-pre-wrap" style={{ userSelect: "all" }}>{buildReport()}</pre>)}
+            {showReport && (<pre className="text-[11px] bg-black text-green-400 border border-green-900 rounded-xl p-2 mb-2 overflow-x-auto whitespace-pre-wrap font-terminal" style={{ userSelect: "all" }}>{buildReport()}</pre>)}
             {!supaOn && <p className="text-xs italic text-slate-500 bg-slate-900 rounded-xl p-3">mission control: offline (no supabase keys)</p>}
             {supaOn && (
               <div>
@@ -317,7 +338,7 @@ export default function AdminPanel(p: Props) {
                 {rts.st === "connected" && list.length <= 1 && (<p className="text-xs italic text-slate-500 mt-1">only you. lonely.</p>)}
                 <button onClick={() => setExpanded(expanded === "all" ? null : "all")} className="w-full bg-red-900 rounded-xl p-2 text-xs font-black uppercase mb-2">fire at everyone {expanded === "all" ? "-" : "+"}</button>
                 {expanded === "all" && fireMenu("all")}
-                <div className="space-y-2 mt-2 max-h-64 overflow-y-auto overscroll-contain">
+                <div onClick={(e) => { if (e.target === e.currentTarget) setExpanded(null); }} className="space-y-2 mt-2 max-h-64 overflow-y-auto overscroll-contain">
                   {list.map((v) => {
                     const idleS = Math.floor((now - v.lastActive) / 1000);
                     const idle = idleS > 60;
@@ -327,7 +348,7 @@ export default function AdminPanel(p: Props) {
                         <button onClick={() => setExpanded(expanded === v.id ? null : v.id)} className={`w-full text-left bg-slate-900 rounded-xl p-3 ${idle ? "opacity-60" : ""}`}>
                           <span className="flex items-center gap-2">
                             <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse shrink-0" />
-                            <span className="font-bold text-base">{v.name}{v.id === myId ? " (you)" : ""}</span>
+                            <span className={v.custom ? "font-bold text-base" : "font-bold text-base italic opacity-70"}>{v.name}{v.id === myId ? " (you)" : ""}{!v.custom && <span className="ml-1 text-[10px] not-italic text-slate-500">npc energy</span>}</span>
                           </span>
                           <span className="block text-[11px] text-slate-400 mt-1">joined {rel(v.joinedAt, now)} • suffered {countsRef.current[v.id] || 0} gags • {idle ? "idle " + rel(v.lastActive, now) : "active " + rel(v.lastActive, now)}</span>
                         </button>
@@ -344,6 +365,13 @@ export default function AdminPanel(p: Props) {
                 </div>
               </div>
             )}
+            <p className="text-xs font-bold uppercase text-slate-400 mt-4 mb-2">fire log</p>
+            <div className="space-y-1 max-h-24 overflow-y-auto overscroll-contain bg-black rounded-xl p-2 mb-2">
+              {fireLog.length === 0 && <p className="text-slate-500 text-[11px] italic">no shots fired yet.</p>}
+              {fireLog.slice(-8).reverse().map((fl) => (
+                <p key={fl.nonce} className="text-[11px]"><span className="text-slate-500">{new Date(fl.at).toLocaleTimeString()} </span>{fl.text} <span className={fl.ok ? "text-green-400 font-bold" : "text-slate-500"}>{fl.ok ? "delivered ✓" : "..."}</span></p>
+              ))}
+            </div>
             <p className="text-xs font-bold uppercase text-slate-400 mt-4 mb-2">spy feed</p>
             <div className="space-y-1 max-h-40 overflow-y-auto overscroll-contain bg-black rounded-xl p-2">
               {feed.length === 0 && <p className="text-slate-500 text-xs italic">no gossip yet.</p>}
@@ -365,7 +393,7 @@ export default function AdminPanel(p: Props) {
           <Section id="chaos" title="chaos triggers" shut={shut} onFlip={flip}>
             <div className="grid grid-cols-2 gap-2">
               {GAGS.map((g) => (
-                <button key={g} onClick={() => p.onGag(g)} className="bg-slate-800 rounded-xl p-3 text-xs font-black uppercase">{g}</button>
+                <button key={g} onClick={() => p.onGag(g)} className="bg-slate-800 rounded-xl p-3 text-xs font-black uppercase danger-hover">{g}</button>
               ))}
             </div>
           </Section>
