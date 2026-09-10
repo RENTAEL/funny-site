@@ -185,6 +185,7 @@ export default function OppositeExe() {
   const sidRef = useRef("");
   const nameRef = useRef("mystery guest");
   const liveAdmin = useRef(false);
+  const adminOpenRef = useRef(false);
   const supaAdmin = useRef(false);
   const lastSupaRef = useRef(0);
   const supaChatRef = useRef<((text: string) => void) | null>(null);
@@ -234,7 +235,7 @@ export default function OppositeExe() {
       document.title = TITLES[Math.floor(Math.random() * TITLES.length)];
     }, 3000);
     const toastInterval = setInterval(() => {
-      if (silencedRef.current) return;
+      if (silencedRef.current || adminOpenRef.current) return;
       const msg = TOASTS[Math.floor(Math.random() * TOASTS.length)];
       setToast(msg);
       setTimeout(() => setToast(null), 4000);
@@ -267,13 +268,15 @@ export default function OppositeExe() {
     };
     document.addEventListener('visibilitychange', handleVis);
     const idleInterval = setInterval(() => {
-      if (!silencedRef.current && Date.now() - lastActive.current > 10000) {
+      if (!silencedRef.current && !adminOpenRef.current && Date.now() - lastActive.current > 10000) {
         lastActive.current = Date.now();
         setToast("hello?? did you fall asleep? honestly fair.");
         setTimeout(() => setToast(null), 4000);
       }
     }, 1000);
     const handleCopy = (e: ClipboardEvent) => {
+      const t0 = e.target as HTMLElement;
+      if (t0 && t0.closest && t0.closest("[data-admin-zone]")) return;
       e.preventDefault();
       if (e.clipboardData) e.clipboardData.setData('text/plain', 'you thought \u{1F480}');
       setToast("stealing my content? bold.");
@@ -462,6 +465,8 @@ export default function OppositeExe() {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      const kk = e.target as HTMLElement;
+      if (kk && kk.closest && kk.closest("[data-admin-zone]")) return;
       const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
       if (k === KONAMI[konamiIdx.current]) {
         konamiIdx.current += 1;
@@ -649,6 +654,8 @@ export default function OppositeExe() {
 
   useEffect(() => {
     const onType = (e: KeyboardEvent) => {
+      const kt = e.target as HTMLElement;
+      if (kt && kt.closest && kt.closest("[data-admin-zone]")) return;
       if (e.key.length !== 1) return;
       phraseBuf.current = (phraseBuf.current + e.key.toLowerCase()).slice(-30);
       if (phraseBuf.current.endsWith(SECRET_PHRASE)) {
@@ -695,7 +702,7 @@ export default function OppositeExe() {
   useEffect(() => {
     let dead = false;
     let beatTimer: ReturnType<typeof setInterval> | null = null;
-    type SupaClient = { removeAllChannels: () => void; channel: (n: string) => { subscribe: (cb?: (s: string, e?: Error) => void) => void; track: (o: object) => void; untrack: () => void; presenceState: () => Record<string, Array<{ id: string; name: string }>>; on: (t: string, f: object, cb: (m: { payload: never }) => void) => { subscribe: (cb?: (s: string) => void) => void }; send: (m: object) => void } };
+    type SupaClient = { removeAllChannels: () => void; channel: (n: string, opts?: object) => { subscribe: (cb?: (s: string, e?: Error) => void) => void; track: (o: object) => void; untrack: () => void; presenceState: () => Record<string, Array<{ id: string; name: string }>>; on: (t: string, f: object, cb: (m: { payload: never }) => void) => { subscribe: (cb?: (s: string) => void) => void }; send: (m: object) => void } };
     let sb: SupaClient | null = null;
     (async () => {
       const cfg = await fetch("/api/config").then((r) => r.json()).catch(() => ({ off: true }));
@@ -724,14 +731,8 @@ export default function OppositeExe() {
       vidRef.current = vid;
       try { sessionStorage.setItem("opp_vid", vid); } catch { /* no pocket */ }
       const started = Date.now();
-      const vis = sb.channel("visitors");
+      const vis = sb.channel("visitors", { config: { private: false } });
       const hello = () => { try { vis.track({ id: vid, name: nm, joinedAt: started, lastActive: Date.now() }); } catch (e) { console.log("[supabase] track failed", e); } };
-      vis.subscribe((status: string, err?: Error) => {
-        console.log("[supabase] visitors subscribe:", status, err || "");
-        if (status === "SUBSCRIBED" && !dead) hello();
-        else if (!dead) console.log("[supabase] offline: subscribe failed: " + status);
-      });
-      beatTimer = setInterval(() => { if (dead) return; hello(); if (supaAdmin.current && Date.now() - lastSupaRef.current > 30000) supaAdmin.current = false; }, 15000);
       vis.on("presence", { event: "sync" }, () => {
         const state = vis.presenceState() as Record<string, Array<{ id: string; name: string }>>;
         const ids = Object.keys(state);
@@ -754,12 +755,18 @@ export default function OppositeExe() {
           }
         });
       });
-      const spyCh = sb.channel("spy");
+      vis.subscribe((status: string, err?: Error) => {
+        console.log("[supabase] visitors subscribe:", status, err || "");
+        if (status === "SUBSCRIBED" && !dead) hello();
+        else if (!dead) console.log("[supabase] offline: subscribe failed: " + status);
+      });
+      beatTimer = setInterval(() => { if (dead) return; hello(); if (supaAdmin.current && Date.now() - lastSupaRef.current > 30000) supaAdmin.current = false; }, 15000);
+      const spyCh = sb.channel("spy", { config: { private: false } });
       spyCh.subscribe();
       spySendRef.current = (msg: string) => {
         try { spyCh.send({ type: "broadcast", event: "spy", payload: { from: nm, text: msg, at: Date.now() } }); } catch { /* no witnesses */ }
       };
-      const orders = sb.channel("orders");
+      const orders = sb.channel("orders", { config: { private: false } });
       orders
         .on("broadcast", { event: "command" }, (m: { payload: { to: string; gag: string; arg: string } }) => {
           const d = m.payload;
@@ -769,9 +776,9 @@ export default function OppositeExe() {
           runRemoteGag(d.gag, d.arg || "");
         })
         .subscribe();
-      const support = sb.channel("support");
+      const support = sb.channel("support", { config: { private: false } });
       support.subscribe();
-      const room = sb.channel("room");
+      const room = sb.channel("room", { config: { private: false } });
       room
         .on("broadcast", { event: "msg" }, (m: { payload: RoomMsg }) => {
           const d = m.payload;
@@ -800,6 +807,7 @@ export default function OppositeExe() {
     };
   }, []);
 
+  useEffect(() => { adminOpenRef.current = adminOpen; }, [adminOpen]);
   const anyOverlay = termsOpen || bsod || updateOpen || !booted || banners.length > 0;
   useEffect(() => {
     if (!anyOverlay) return;
@@ -1152,7 +1160,7 @@ export default function OppositeExe() {
       }
       document.querySelectorAll("button").forEach((b) => {
         const el = b as HTMLElement;
-        if (el.closest("[data-no-flee]")) return;
+        if (el.closest("[data-no-flee]") || el.closest("[data-admin-zone]")) return;
         const r = b.getBoundingClientRect();
         const dx = (r.left + r.width / 2) - e.clientX;
         const dy = (r.top + r.height / 2) - e.clientY;
@@ -1208,7 +1216,10 @@ export default function OppositeExe() {
     let n = 0;
     const t = setTimeout(() => setGremlin(false), 15000);
     const onKey = (e: KeyboardEvent) => {
+      const kk = e.target as HTMLElement;
+      if (kk && kk.closest && kk.closest("[data-admin-zone]")) return;
       const el = document.activeElement as HTMLInputElement | null;
+      if (el && el.closest("[data-admin-zone]")) return;
       if (!el || (el.tagName !== "INPUT" && el.tagName !== "TEXTAREA")) return;
       n += 1;
       if (n % 5 !== 0) return;
@@ -1295,7 +1306,7 @@ export default function OppositeExe() {
     const move = (e: MouseEvent) => {
       document.querySelectorAll("button").forEach((b) => {
         const el = b as HTMLElement;
-        if (el.closest("[data-no-flee]")) return;
+        if (el.closest("[data-no-flee]") || el.closest("[data-admin-zone]")) return;
         const r = b.getBoundingClientRect();
         const dx = (r.left + r.width / 2) - e.clientX;
         const dy = (r.top + r.height / 2) - e.clientY;
@@ -1315,6 +1326,8 @@ export default function OppositeExe() {
   useEffect(() => {
     if (!butter) return;
     const onClick = (e: MouseEvent) => {
+      const bt = e.target as HTMLElement;
+      if (bt && bt.closest && bt.closest("[data-admin-zone]")) return;
       if (Math.random() < 0.3) {
         e.preventDefault();
         e.stopPropagation();

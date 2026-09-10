@@ -67,12 +67,16 @@ export default function AdminPanel(p: Props) {
   const [tick, setTick] = useState(0);
   const countsRef = useRef<Record<string, number>>({});
   const orderSend = useRef<((to: string, gag: string, arg: string) => void) | null>(null);
+  const stagesRef = useRef<string[]>([]);
+  const stage = (s: string) => { stagesRef.current.push(new Date().toLocaleTimeString() + " " + s); };
+  const [showReport, setShowReport] = useState(false);
   useEffect(() => {
     const t = setInterval(() => setTick((n) => n + 1), 5000);
     return () => clearInterval(t);
   }, []);
   useEffect(() => {
     try { setMyId(sessionStorage.getItem("opp_vid") || ""); } catch { /* no pocket */ }
+    stage("panel opened");
     if (!p.open) return;
     let dead = false;
     const timers: ReturnType<typeof setInterval>[] = [];
@@ -81,6 +85,7 @@ export default function AdminPanel(p: Props) {
       .then(async (cfg) => {
         if (dead) return;
         if (cfg.off || !cfg.supaUrl || !cfg.supaKey) {
+          stage("config: env vars missing");
           setRts({ st: "offline", reason: "env vars missing" });
           return;
         }
@@ -93,15 +98,18 @@ export default function AdminPanel(p: Props) {
           return;
         }
         if (dead) return;
-        const sb = supaFn() as { removeAllChannels: () => void; channel: (n: string) => { subscribe: (cb?: (s: string) => void) => void; presenceState: () => Record<string, Array<{ id: string; name: string }>>; track: (o: object) => void; send: (m: object) => void; on: (t: string, f: object, cb: (m: { payload: never }) => void) => { subscribe: (cb?: (s: string) => void) => void } }; };
+        const sb = supaFn() as { removeAllChannels: () => void; channel: (n: string, opts?: object) => { subscribe: (cb?: (s: string) => void) => void; presenceState: () => Record<string, Array<{ id: string; name: string }>>; track: (o: object) => void; send: (m: object) => void; on: (t: string, f: object, cb: (m: { payload: never }) => void) => { subscribe: (cb?: (s: string) => void) => void } }; };
         sbRef.current = sb;
+        stage("client created");
+        timers.push(setTimeout(() => { setRts((r) => { if (r.st === "connected") return r; console.log("[supabase] watchdog: " + JSON.stringify(stagesRef.current)); return { st: "offline", reason: "subscribe timed out" }; }); }, 10000));
         setRts({ st: "connecting", reason: "" });
         setSupaOn(true);
-        const vis = sb.channel("visitors");
+        const vis = sb.channel("visitors", { config: { private: false } });
         vis
           .on("presence", { event: "sync" }, () => {
             const state = vis.presenceState() as Record<string, Visitor[]>;
             console.log("[supabase] admin presence sync");
+            stage("sync received");
             const next: Record<string, Visitor> = {};
             Object.keys(state).forEach((k) => {
               const v = state[k][0];
@@ -128,25 +136,35 @@ export default function AdminPanel(p: Props) {
                 }, 3000);
               }
             });
-            vref.current = next;
             setVisitorsRef(next);
             setVisitors(next);
           })
-        const spy = sb.channel("spy");
+          .subscribe((status: string, err?: Error) => {
+            console.log("[supabase] admin visitors subscribe:", status, err || "");
+            stage("subscribe status: " + status);
+            if (status === "SUBSCRIBED") setRts({ st: "connected", reason: "" });
+            else if (status === "CHANNEL_ERROR") setRts({ st: "offline", reason: "channel error" });
+            else if (status === "TIMED_OUT") setRts({ st: "offline", reason: "timed out" });
+            else if (status === "CLOSED") setRts({ st: "offline", reason: "closed" });
+            else setRts({ st: "offline", reason: "subscribe failed: " + status });
+          });
+        const spy = sb.channel("spy", { config: { private: false } });
         spy
           .on("broadcast", { event: "spy" }, (m: { payload: SpyMsg }) => {
             const d = m.payload;
             if (!d || !d.from) return;
             setFeed((prev) => [...prev.slice(-29), { from: d.from, text: d.text, at: d.at, k: "a" + (inboxK++) }]);
           })
-        const support = sb.channel("support");
+          .subscribe();
+        const support = sb.channel("support", { config: { private: false } });
         support
           .on("broadcast", { event: "support-msg" }, (m: { payload: SupportMsg }) => {
             const d = m.payload;
             if (!d || !d.id) return;
             setInbox((prev) => [...prev.slice(-49), { id: d.id, name: d.name, text: d.text, at: d.at, k: "a" + (inboxK++) }]);
           })
-        const orders = sb.channel("orders");
+          .subscribe();
+        const orders = sb.channel("orders", { config: { private: false } });
         orderSend.current = (to: string, gag: string, arg: string) => {
           try {
             orders.send({ type: "broadcast", event: "command", payload: { to, gag, arg } });
@@ -160,6 +178,7 @@ export default function AdminPanel(p: Props) {
           setVisitors((prev) => {
             const now = Date.now();
             console.log("[supabase] admin presence sync");
+            stage("sync received");
             const next: Record<string, Visitor> = {};
             Object.keys(prev).forEach((id) => {
               if (now - prev[id].lastActive < 30000) next[id] = prev[id];
@@ -186,6 +205,27 @@ export default function AdminPanel(p: Props) {
     setTick((n) => n + 1);
   };
   const remoteGag = (id: string, g: string) => sendOrder(id, g, "");
+  const buildReport = () => {
+    const lines = [
+      "opposite.exe debug report",
+      "time: " + new Date().toISOString(),
+      "realtime: " + rts.st + (rts.reason !== "" ? " (" + rts.reason + ")" : ""),
+      "visitors seen: " + Object.keys(visitors).length,
+      "stages:",
+      ...stagesRef.current,
+    ];
+    return lines.join("\\n");
+  };
+  const copyReport = async () => {
+    const rep = buildReport();
+    console.log(rep);
+    try {
+      await navigator.clipboard.writeText(rep);
+      p.notify("report copied");
+    } catch {
+      setShowReport(true);
+    }
+  };
   const flip = (id: string) => setShut((s) => ({ ...s, [id]: !s[id] }));
   if (!p.open) return null;
   const now = Date.now();
@@ -219,7 +259,7 @@ export default function AdminPanel(p: Props) {
   void visitorsRef;
   return (
     <PortalBox>
-      <div data-panel onWheel={(e) => e.stopPropagation()} onTouchMove={(e) => e.stopPropagation()} className="fixed z-[200] font-mono left-0 right-0 bottom-0 h-[60vh] rounded-t-2xl md:left-auto md:right-0 md:top-0 md:bottom-0 md:h-full md:w-[380px] md:rounded-none bg-slate-950 text-slate-100 border-t-2 md:border-t-0 md:border-l-2 border-red-500 flex flex-col">
+      <div data-panel data-admin-zone onWheel={(e) => e.stopPropagation()} onTouchMove={(e) => e.stopPropagation()} className="fixed z-[200] font-mono left-0 right-0 bottom-0 h-[60vh] rounded-t-2xl md:left-auto md:right-0 md:top-0 md:bottom-0 md:h-full md:w-[380px] md:rounded-none bg-slate-950 text-slate-100 border-t-2 md:border-t-0 md:border-l-2 border-red-500 flex flex-col">
         <div className="flex items-center justify-between p-3 border-b border-slate-800 shrink-0" onClick={() => setFolded(true)}>
           <span className="font-black text-sm tracking-widest">opposite control</span>
           <span className="flex gap-2">
@@ -232,6 +272,8 @@ export default function AdminPanel(p: Props) {
             <p className="flex items-center gap-2 text-xs font-black mb-2">
               {rts.st === "connected" ? (<><span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" /><span>realtime: connected</span></>) : rts.st === "connecting" ? (<><span className="w-2 h-2 rounded-full bg-yellow-500 animate-pulse" /><span>realtime: connecting...</span></>) : (<><span className="w-2 h-2 rounded-full bg-red-500" /><span>realtime: offline{rts.reason !== "" ? ": " + rts.reason : ""}</span></>)}
             </p>
+            <button onClick={copyReport} className="w-full bg-slate-800 rounded-xl p-2 text-xs font-black uppercase mb-2">copy debug report</button>
+            {showReport && (<pre className="text-[11px] bg-black rounded-xl p-2 mb-2 overflow-x-auto whitespace-pre-wrap" style={{ userSelect: "all" }}>{buildReport()}</pre>)}
             {!supaOn && <p className="text-xs italic text-slate-500 bg-slate-900 rounded-xl p-3">mission control: offline (no supabase keys)</p>}
             {supaOn && (
               <div>

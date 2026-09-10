@@ -20,3 +20,6 @@ admin sees the room feed in mission control, posts as "opposite.exe support team
 can shadowban names (local hide only). nothing is stored anywhere. obviously.
 chat room runs on the "room" broadcast channel (event "msg": id, name, text, at).
 support dms use the "support" channel. admin presence heartbeat every 15s on "orders".
+--- dev crash recovery ---
+dev server crashed with "cannot find module" webpack errors = stale .next cache.
+do not hot-recover. run: npm run clean (wipes .next, restarts dev).
