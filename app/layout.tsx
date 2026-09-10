@@ -1,12 +1,13 @@
 import './globals.css';
 import type { Metadata } from 'next';
-import { Inter } from 'next/font/google';
+import { Inter, Space_Grotesk } from 'next/font/google';
 
 const inter = Inter({ subsets: ['latin'] });
+const grotesk = Space_Grotesk({ subsets: ['latin'], variable: '--font-display' });
 
 export const metadata: Metadata = {
-  title: 'The Most Honest Website on Earth',
-  description: 'A truly honest experience.',
+  title: 'opposite — productivity, perfected.',
+  description: 'the app that does the opposite of what you want. enterprise ready.',
 };
 
 export default function RootLayout({
@@ -16,7 +17,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className={inter.className}>{children}</body>
+      <body className={`${inter.className} ${grotesk.variable}`}>{children}</body>
     </html>
   );
 }
