@@ -289,15 +289,15 @@ export default function AdminPanel(p: Props) {
       <p className="text-[11px] font-black text-red-400 mb-2">TARGET LOCKED: {nm}</p>
       <div className="grid grid-cols-3 gap-1 mb-2">
         {GAGS.map((g) => (
-          <button key={g} onClick={() => remoteGag(id, g)} className="bg-slate-800 rounded-lg p-2 text-[11px] font-black uppercase danger-hover">{g}</button>
+          <button key={g} onClick={() => remoteGag(id, g)} className="bg-slate-800 rounded-lg p-2 min-h-[44px] text-[11px] font-black uppercase danger-hover">{g}</button>
         ))}
       </div>
       <div className="flex gap-1 mb-1">
-        <input data-testid="remote-toast" value={remoteToast} onChange={(e) => setRemoteToast(e.target.value)} placeholder="toast them..." className="flex-1 min-w-0 bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs" />
+        <input data-testid="remote-toast" value={remoteToast} onChange={(e) => setRemoteToast(e.target.value)} placeholder="toast them..." className="flex-1 min-w-0 bg-slate-900 border border-slate-700 rounded-lg p-2 text-base" />
         <button onClick={() => { if (remoteToast.trim() === "") return; sendOrder(id, "toast", remoteToast); setRemoteToast(""); }} className="bg-lime-400 text-black font-black text-[11px] uppercase rounded-lg px-3">send</button>
       </div>
       <div className="flex gap-1">
-        <input data-testid="remote-speak" value={remoteSpeak} onChange={(e) => setRemoteSpeak(e.target.value)} placeholder="robot says..." className="flex-1 min-w-0 bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs" />
+        <input data-testid="remote-speak" value={remoteSpeak} onChange={(e) => setRemoteSpeak(e.target.value)} placeholder="robot says..." className="flex-1 min-w-0 bg-slate-900 border border-slate-700 rounded-lg p-2 text-base" />
         <button onClick={() => { if (remoteSpeak.trim() === "") return; sendOrder(id, "speak", remoteSpeak); setRemoteSpeak(""); }} className="bg-lime-400 text-black font-black text-[11px] uppercase rounded-lg px-3">speak</button>
       </div>
     </div>
@@ -306,7 +306,7 @@ export default function AdminPanel(p: Props) {
   if (folded) {
     return (
       <PortalBox>
-        <button onClick={() => setFolded(false)} className="fixed right-0 top-1/2 -translate-y-1/2 z-[200] bg-red-600 text-white font-black px-2 py-4 rounded-l-xl">◀</button>
+        <button onClick={() => setFolded(false)} className="fixed right-0 top-1/2 -translate-y-1/2 z-[200] bg-red-600 text-white font-black px-3 py-5 rounded-l-xl">◀</button>
       </PortalBox>
     );
   }
@@ -314,7 +314,7 @@ export default function AdminPanel(p: Props) {
   void visitorsRef;
   return (
     <PortalBox>
-      <div data-panel data-admin-zone onWheel={(e) => e.stopPropagation()} onTouchMove={(e) => e.stopPropagation()} className="fixed z-[200] font-mono left-0 right-0 bottom-0 h-[60vh] rounded-t-2xl md:left-auto md:right-0 md:top-0 md:bottom-0 md:h-full md:w-[380px] md:rounded-none bg-slate-950 text-slate-100 border-t-2 md:border-t-0 md:border-l-2 border-red-500 flex flex-col">
+      <div data-panel data-admin-zone onWheel={(e) => e.stopPropagation()} onTouchMove={(e) => e.stopPropagation()} className="fixed z-[200] font-mono touch-manipulation left-0 right-0 bottom-0 h-[60vh] supports-[height:100dvh]:h-[60dvh] rounded-t-2xl md:left-auto md:right-0 md:top-0 md:bottom-0 md:h-full md:w-[380px] md:rounded-none bg-slate-950 text-slate-100 border-t-2 md:border-t-0 md:border-l-2 border-red-500 flex flex-col">
         <div className="flex items-center justify-between p-3 border-b border-slate-800 shrink-0" onClick={() => setFolded(true)}>
           <span className="font-black text-sm tracking-widest">opposite control</span>
           <span className="flex gap-2">
@@ -322,7 +322,7 @@ export default function AdminPanel(p: Props) {
             <button onClick={(e) => { e.stopPropagation(); p.onClose(); }} className="font-black px-2">X</button>
           </span>
         </div>
-        <div className="flex-1 overflow-y-auto overscroll-contain">
+        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain">
           <Section id="surv" title="surveillance" shut={shut} onFlip={flip}>
             <p className="flex items-center gap-2 text-xs font-black mb-2">
               {rts.st === "connected" ? (<><span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" /><span>realtime: connected</span></>) : rts.st === "connecting" ? (<><span className="w-2 h-2 rounded-full bg-yellow-500 animate-pulse" /><span>realtime: connecting...</span></>) : (<><span className="w-2 h-2 rounded-full bg-red-500" /><span>realtime: offline{rts.reason !== "" ? ": " + rts.reason : ""}</span></>)}
@@ -399,16 +399,16 @@ export default function AdminPanel(p: Props) {
           </Section>
           <Section id="pup" title="puppeteer" shut={shut} onFlip={flip}>
             <div className="flex gap-2 mb-2">
-              <input value={ghostText} onChange={(e) => setGhostText(e.target.value)} placeholder="ghost types..." className="flex-1 min-w-0 bg-slate-900 border border-slate-700 rounded-xl p-3 text-sm" />
+              <input value={ghostText} onChange={(e) => setGhostText(e.target.value)} placeholder="ghost types..." className="flex-1 min-w-0 bg-slate-900 border border-slate-700 rounded-xl p-3 text-base" />
               <button onClick={() => { if (ghostText.trim() === "") return; p.onTypeText(ghostText); setGhostText(""); }} className="bg-purple-600 font-black text-xs uppercase rounded-xl px-4">type</button>
             </div>
             <button onClick={p.onScrollPrison} className="w-full bg-indigo-600 rounded-xl p-3 text-xs font-black uppercase mb-2">scroll prison (10s)</button>
             <div className="flex gap-2 mb-2">
-              <input value={toastText} onChange={(e) => setToastText(e.target.value)} placeholder="custom toast" className="flex-1 min-w-0 bg-slate-900 border border-slate-700 rounded-xl p-3 text-sm" />
+              <input value={toastText} onChange={(e) => setToastText(e.target.value)} placeholder="custom toast" className="flex-1 min-w-0 bg-slate-900 border border-slate-700 rounded-xl p-3 text-base" />
               <button onClick={() => { if (toastText.trim() === "") return; p.notify(toastText); setToastText(""); }} className="bg-lime-400 text-black font-black text-xs uppercase rounded-xl px-4">send</button>
             </div>
             <div className="flex gap-2">
-              <input value={speakText} onChange={(e) => setSpeakText(e.target.value)} placeholder="robot says..." className="flex-1 min-w-0 bg-slate-900 border border-slate-700 rounded-xl p-3 text-sm" />
+              <input value={speakText} onChange={(e) => setSpeakText(e.target.value)} placeholder="robot says..." className="flex-1 min-w-0 bg-slate-900 border border-slate-700 rounded-xl p-3 text-base" />
               <button onClick={() => { if (speakText.trim() === "") return; p.speak(speakText); setSpeakText(""); }} className="bg-lime-400 text-black font-black text-xs uppercase rounded-xl px-4">speak</button>
             </div>
           </Section>
