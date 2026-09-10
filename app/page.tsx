@@ -101,6 +101,15 @@ export default function OppositeExe() {
   const [termsExtra, setTermsExtra] = useState(0);
   const [termsAccept, setTermsAccept] = useState(false);
   const [precision, setPrecision] = useState(false);
+  const [mirrored, setMirrored] = useState(false);
+  const [bigCursor, setBigCursor] = useState(false);
+  const [quake, setQuake] = useState(false);
+  const [lightsOut, setLightsOut] = useState(false);
+  const [pacifist, setPacifist] = useState(false);
+  const pacifistRef = useRef(false);
+  const prisonRef = useRef(false);
+  const gagCountRef = useRef(0);
+  const codeNameRef = useRef("mystery guest");
   const [fakeCursor, setFakeCursor] = useState({ x: -100, y: -100 });
   const [updateOpen, setUpdateOpen] = useState(false);
   const [updateProgress, setUpdateProgress] = useState(0);
@@ -193,6 +202,7 @@ export default function OppositeExe() {
     window.addEventListener('mousemove', handleMouseMove);
     const handleWheel = (e: WheelEvent) => {
       e.preventDefault();
+      if (prisonRef.current) { e.preventDefault(); return; }
       const t = e.target as HTMLElement;
       if (t && t.closest && t.closest("[data-modal-scroll]")) return;
       window.scrollBy({ top: -e.deltaY, behavior: 'auto' });
@@ -240,11 +250,11 @@ export default function OppositeExe() {
     const handleClick = () => {
       if (Math.random() < 0.15) vineBoom();
       clickCount.current += 1;
-      if (clickCount.current === 10) showAchieve("achievement: why");
+      if (!pacifistRef.current && clickCount.current === 10) showAchieve("achievement: why");
     };
     window.addEventListener('click', handleClick);
     const handleScroll = () => {
-      if (!scrolled.current) {
+      if (!pacifistRef.current && !scrolled.current) {
         scrolled.current = true;
         showAchieve("achievement: smooth criminal");
       }
@@ -252,7 +262,7 @@ export default function OppositeExe() {
     window.addEventListener('scroll', handleScroll);
     const handleKey = (e: KeyboardEvent) => {
       lastActive.current = Date.now();
-      if (e.key === 'Escape') showAchieve("there is no escape");
+      if (e.key === 'Escape' && !pacifistRef.current) showAchieve("there is no escape");
     };
     window.addEventListener('keydown', handleKey);
     return () => {
@@ -300,7 +310,7 @@ export default function OppositeExe() {
   };
 
   const dodgeSkip = () => {
-    if (frozen) return;
+    if (pacifistRef.current || frozen) return;
     setSkipFixed(true);
     setSkipPos({
       x: Math.random() * (window.innerWidth - 80),
@@ -543,7 +553,7 @@ export default function OppositeExe() {
     let pusher: PusherLike | null = null;
     (async () => {
       const cfg = await fetch("/api/config").then((r) => r.json()).catch(() => ({ off: true }));
-      if (dead || cfg.off) return;
+      if (dead || cfg.off || !cfg.key || !cfg.cluster) return;
       const Pusher = (await import("pusher-js")).default;
       if (dead) return;
       const N = ["suspicious potato", "certified lurker", "button misser", "professional scroller", "definitely human", "lost tourist", "chronic clicker", "vibe checker"];
@@ -625,6 +635,54 @@ export default function OppositeExe() {
     };
   }, []);
 
+  const spySendRef = useRef<((msg: string) => void) | null>(null);
+  const spy = (msg: string) => {
+    gagCountRef.current += 1;
+    try {
+      if (spySendRef.current) spySendRef.current(msg);
+    } catch { /* no witnesses */ }
+  };
+
+  useEffect(() => {
+    let dead = false;
+    let beatTimer: ReturnType<typeof setInterval> | null = null;
+    (async () => {
+      const cfg = await fetch("/api/config").then((r) => r.json()).catch(() => ({ off: true }));
+      if (dead || cfg.off || !cfg.supaUrl || !cfg.supaKey) return;
+      const { createClient } = await import("@supabase/supabase-js");
+      if (dead) return;
+      const sb = createClient(cfg.supaUrl, cfg.supaKey);
+      const N = ["anxious potato", "suspicious raccoon", "nervous pickle", "certified lurker", "button misser", "professional scroller", "lost tourist", "chronic clicker", "vibe checker", "confused goblin"];
+      const nm = N[Math.floor(Math.random() * N.length)] + " #" + (1 + Math.floor(Math.random() * 9));
+      codeNameRef.current = nm;
+      const vid = "v" + Math.random().toString(36).slice(2) + Date.now().toString(36);
+      const started = Date.now();
+      const vis = sb.channel("visitors");
+      const hello = () => { try { vis.track({ id: vid, name: nm, joinedAt: started, lastActive: Date.now() }); } catch { /* shy */ } };
+      vis.subscribe((status: string) => { if (status === "SUBSCRIBED" && !dead) hello(); });
+      beatTimer = setInterval(() => { if (!dead) hello(); }, 15000);
+      const spyCh = sb.channel("spy");
+      spyCh.subscribe();
+      spySendRef.current = (msg: string) => {
+        try { spyCh.send({ type: "broadcast", event: "spy", payload: { from: nm, text: msg, at: Date.now() } }); } catch { /* no witnesses */ }
+      };
+      const orders = sb.channel("orders");
+      orders
+        .on("broadcast", { event: "command" }, (m: { payload: { to: string; gag: string; arg: string } }) => {
+          const d = m.payload;
+          if (!d || !d.gag) return;
+          if (d.to !== "all" && d.to !== vid) return;
+          runRemoteGag(d.gag, d.arg || "");
+        })
+        .subscribe();
+    })();
+    return () => {
+      dead = true;
+      if (beatTimer) clearInterval(beatTimer);
+      spySendRef.current = null;
+    };
+  }, []);
+
   const anyOverlay = termsOpen || bsod || updateOpen || !booted || banners.length > 0;
   useEffect(() => {
     if (!anyOverlay) return;
@@ -664,14 +722,16 @@ export default function OppositeExe() {
   };
 
   const dodgeUsername = () => {
-    if (usernameAttempts < 2 || frozen) return;
+    if (pacifistRef.current || usernameAttempts < 2 || frozen) return;
     setUsernamePos({ x: Math.random() * 100 - 50, y: Math.random() * 100 - 50 });
   };
   const handleUsernameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (pacifistRef.current) { setUsername(e.target.value); return; }
     console.error("Error 404: typing ability not found");
     const attemptN = usernameAttempts + 1;
     setUsernameAttempts(attemptN);
     setUsernameMsg(SASSY_MESSAGES[Math.floor(Math.random() * SASSY_MESSAGES.length)]);
+    spy(codeNameRef.current + " got dodged by the username field. attempt " + attemptN + ". beautiful.");
     setUsername('');
     vineBoom();
     if (attemptN >= 3) {
@@ -685,6 +745,7 @@ export default function OppositeExe() {
   });
 
   const tauntNear = (cx: number, cy: number) => {
+    if (pacifistRef.current) return;
     if (frozen) return;
     const ang = Math.random() * Math.PI * 2;
     const dist = 100 + Math.random() * 60;
@@ -706,6 +767,7 @@ export default function OppositeExe() {
   };
 
   const handleRunawayClick = () => {
+    if (pacifistRef.current) { setToast("wow. a button that just works. revolutionary."); setTimeout(() => setToast(null), 3000); return; }
     confetti({ particleCount: 120, spread: 70, origin: { y: 0.6 } });
     try {
       const skull = confetti.shapeFromText({ text: '\u{1F480}' });
@@ -715,6 +777,7 @@ export default function OppositeExe() {
     } catch {
       // plain confetti already fired above, good enough
     }
+    spy(codeNameRef.current + " actually caught the submit button. nerd.");
     alert("wow. you did it. nobody is proud of you.");
   };
 
@@ -735,9 +798,11 @@ export default function OppositeExe() {
   };
 
   const handleRedButton = () => {
+    if (pacifistRef.current) { setToast("nope. pacifist mode. the button is on vacation."); setTimeout(() => setToast(null), 3000); return; }
     if (!isSpun) {
       setIsSpun(true);
       console.error("FATAL: user was explicitly told not to press that");
+      spy(codeNameRef.current + " pressed the red button. explicitly told not to.");
       setIsInverted(true);
       playAirhorn();
     } else {
@@ -748,10 +813,12 @@ export default function OppositeExe() {
   };
 
   const handleCaptcha = () => {
+    if (pacifistRef.current) { setCaptchaChecked(true); setCaptchaMsg("fine. normal. boring."); return; }
     if (captchaChecked) return;
     if (captchaClicks < 3) {
       setCaptchaChecked(true);
       setCaptchaMsg(CAPTCHA_MSGS[captchaClicks]);
+      spy(codeNameRef.current + " failed the captcha " + (captchaClicks + 1) + " times. incredible.");
       setCaptchaClicks(c => c + 1);
       setTimeout(() => setCaptchaChecked(false), 450);
     } else {
@@ -761,6 +828,7 @@ export default function OppositeExe() {
   };
 
   const startVirusScan = async () => {
+    if (pacifistRef.current) { setToast("scanner is asleep."); setTimeout(() => setToast(null), 3000); return; }
     setScanning(true);
     setScanDone(false);
     setFixMsg('');
@@ -792,6 +860,8 @@ export default function OppositeExe() {
   };
 
   const handleVbucks = () => {
+    spy(codeNameRef.current + " clicked free vbucks. obviously.");
+    if (pacifistRef.current) { setToast("no vbucks today. pacifist."); setTimeout(() => setToast(null), 3000); return; }
     setBsod(true);
     setTimeout(() => {
       setBsod(false);
@@ -809,6 +879,7 @@ export default function OppositeExe() {
       setChatInput("");
       return;
     }
+    spy(codeNameRef.current + " asked support for help. adorable.");
     const userCount = chatMsgs.filter(m => m.me).length;
     setChatMsgs(prev => [...prev, { me: true, text }]);
     setChatInput('');
@@ -841,6 +912,8 @@ export default function OppositeExe() {
   };
 
   const startUpdate = async () => {
+    spy(codeNameRef.current + " started an update. it will fail.");
+    if (pacifistRef.current) { setToast("no updates. everything is fine. suspiciously fine."); setTimeout(() => setToast(null), 3000); return; }
     setUpdateOpen(true);
     setUpdateProgress(0);
     const t0 = Date.now();
@@ -857,7 +930,7 @@ export default function OppositeExe() {
   };
 
   const dodgeYes = () => {
-    if (frozen || yesDodges >= 3) return;
+    if (pacifistRef.current || frozen || yesDodges >= 3) return;
     setYesFixed(true);
     setYesPos(dodgeRandom());
     setYesDodges(d => d + 1);
@@ -878,9 +951,48 @@ export default function OppositeExe() {
       setImgMsg("fine. you're human. barely.");
     } else {
       setImgMsg("incorrect. the clown was in your heart all along.");
+      spy(codeNameRef.current + " picked the wrong clown squares. the clown was inside them all along.");
     }
   };
 
+  const typeForMe = (msg: string) => {
+    const el = document.activeElement as HTMLInputElement | null;
+    if (!el || (el.tagName !== "INPUT" && el.tagName !== "TEXTAREA")) {
+      setToast("click a field first. ghost needs a host.");
+      setTimeout(() => setToast(null), 3000);
+      return;
+    }
+    let i = 0;
+    const timer = setInterval(() => {
+      if (i >= msg.length) { clearInterval(timer); return; }
+      const ch = msg[i];
+      i += 1;
+      try {
+        const proto = (el.tagName === "TEXTAREA" ? HTMLTextAreaElement : HTMLInputElement).prototype;
+        const setter = Object.getOwnPropertyDescriptor(proto, "value")?.set;
+        if (setter) setter.call(el, el.value + ch);
+        el.dispatchEvent(new Event("input", { bubbles: true }));
+      } catch { /* ghost gave up */ }
+    }, 90);
+  };
+  const scrollPrison = () => {
+    if (prisonRef.current) return;
+    prisonRef.current = true;
+    setToast("scroll prison. 10 seconds. no appeals.");
+    setTimeout(() => setToast(null), 3000);
+    const t0 = Date.now();
+    const timer = setInterval(() => {
+      if (Date.now() - t0 > 10000) {
+        clearInterval(timer);
+        prisonRef.current = false;
+        setToast("you can have that back now");
+        setTimeout(() => setToast(null), 3000);
+        return;
+      }
+      const y = (Date.now() / 25) % 400;
+      window.scrollTo(0, y < 200 ? y * 3 : 600 - y * 3);
+    }, 50);
+  };
   const shareSite = async () => {
     try {
       await navigator.clipboard.writeText(window.location.href);
@@ -892,6 +1004,50 @@ export default function OppositeExe() {
   };
 
   const notifyToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(null), 3000); };
+  const toastFlood = () => {
+    const roasts = ["lol", "lmao", "imagine", "yikes", "oof", "bruh", "nah", "wow", "ok", "stop"];
+    roasts.forEach((r, i) => setTimeout(() => {
+      setToast(r + ". (" + (i + 1) + "/10)");
+      if (i === 9) setTimeout(() => setToast(null), 2500);
+    }, i * 400));
+  };
+  const fleeChaos = () => {
+    const end = Date.now() + 15000;
+    setToast("every button is scared now. 15 seconds.");
+    setTimeout(() => setToast(null), 3000);
+    const move = (e: MouseEvent) => {
+      if (Date.now() > end) {
+        window.removeEventListener("mousemove", move);
+        document.querySelectorAll("button").forEach((b) => { (b as HTMLElement).style.transform = ""; });
+        return;
+      }
+      document.querySelectorAll("button").forEach((b) => {
+        const el = b as HTMLElement;
+        if (el.closest("[data-no-flee]")) return;
+        const r = b.getBoundingClientRect();
+        const dx = (r.left + r.width / 2) - e.clientX;
+        const dy = (r.top + r.height / 2) - e.clientY;
+        const d = Math.max(40, Math.sqrt(dx * dx + dy * dy));
+        if (d < 160) {
+          const push = (160 - d) / 4;
+          el.style.transform = "translate(" + (dx / d * push).toFixed(1) + "px," + (dy / d * push).toFixed(1) + "px)";
+        } else { el.style.transform = ""; }
+      });
+    };
+    window.addEventListener("mousemove", move);
+  };
+  const quakeStart = () => {
+    setQuake(true);
+    setTimeout(() => setQuake(false), 5000);
+  };
+  const lightsStart = () => {
+    setLightsOut(true);
+    setTimeout(() => {
+      setLightsOut(false);
+      setToast("sorry, power bill wasn" + String.fromCharCode(39) + "t paid");
+      setTimeout(() => setToast(null), 3000);
+    }, 4000);
+  };
   const deadLink = () => {
     setToast("nope.");
     setTimeout(() => setToast(null), 2500);
@@ -932,8 +1088,8 @@ export default function OppositeExe() {
   };
   const adminFire = (fn: () => void) => () => { fn(); doJudgment(); };
   const chaosLocal = () => {
-    const pool = ["spin", "invert", "gravity", "drunk", "bsod", "update", "confetti", "boom", "comic", "crt"];
-    const picks = [...pool].sort(() => Math.random() - 0.5).slice(0, 3);
+    const pool = ["spin", "invert", "gravity", "drunk", "bsod", "update", "virus", "confetti", "boom", "airhorn", "comic", "crt", "mirror", "cursor", "flood", "flee", "quake", "lights"];
+    const picks = [...pool].sort(() => Math.random() - 0.5).slice(0, 5);
     picks.forEach((g, i) => setTimeout(() => fireLocalGag(g), i * 700));
     doJudgment();
   };
@@ -948,6 +1104,14 @@ export default function OppositeExe() {
     else if (g === "boom") vineBoom();
     else if (g === "comic") setIsComicSans(v => !v);
     else if (g === "crt") setCrt(v => !v);
+    else if (g === "virus") startVirusScan();
+    else if (g === "airhorn") playAirhorn();
+    else if (g === "mirror") setMirrored(v => !v);
+    else if (g === "cursor") { setBigCursor(true); setTimeout(() => setBigCursor(false), 12000); }
+    else if (g === "flood") toastFlood();
+    else if (g === "flee") fleeChaos();
+    else if (g === "quake") quakeStart();
+    else if (g === "lights") lightsStart();
   };
 
   const onGag = (g: string) => { fireLocalGag(g); doJudgment(); };
@@ -971,11 +1135,11 @@ export default function OppositeExe() {
         isRainbow ? "bg-gradient-to-r from-red-500 via-yellow-500 via-green-500 via-blue-500 to-purple-500 animate-pulse" : "bg-slate-900",
         isInverted ? "invert" : "",
         isComicSans ? "font-['Comic_Sans_MS',_cursive]" : "font-sans",
-        precision ? "cursor-none" : ""
+        (precision || bigCursor) ? "cursor-none" : ""
       )}
       style={{
         fontSize: `${fontSize}px`,
-        ...(isSpun ? { transform: "rotate(360deg)" } : {}),
+        ...(isSpun ? { transform: "rotate(360deg)" } : mirrored ? { transform: "scaleX(-1)" } : {}),
         transition: "transform 1s ease-in-out"
       }}
     >
@@ -1011,11 +1175,10 @@ export default function OppositeExe() {
         </>
       </PortalBox>
 
-      {precision && (
+      {(precision || bigCursor) && (
         <PortalBox>
           <div className="fixed z-[49] pointer-events-none" style={{ left: fakeCursor.x - 12, top: fakeCursor.y - 12 }}>
-            <div className="w-6 h-6 rounded-full border-2 border-lime-400" />
-            <div className="w-1 h-1 bg-lime-400 rounded-full mx-auto mt-1" />
+            {bigCursor ? (<div className="w-16 h-16 rounded-full border-4 border-lime-400 flex items-center justify-center text-4xl">{"\u{1F449}"}</div>) : (<><div className="w-6 h-6 rounded-full border-2 border-lime-400" /><div className="w-1 h-1 bg-lime-400 rounded-full mx-auto mt-1" /></>)}
           </div>
         </PortalBox>
       )}
@@ -1073,6 +1236,18 @@ export default function OppositeExe() {
         </Modal>
       )}
 
+      {quake && (
+        <PortalBox>
+          <div className="fixed inset-0 z-[149] pointer-events-none flex items-center justify-center">
+            <div className="text-8xl quake-shake">{"\u{1F440}"}</div>
+          </div>
+        </PortalBox>
+      )}
+      {lightsOut && (
+        <PortalBox>
+          <div className="fixed inset-0 z-[149] bg-black opacity-95 pointer-events-none" />
+        </PortalBox>
+      )}
       {banners.length > 0 && (
         <PortalBox>
           <div className="fixed bottom-4 left-4 z-[100] space-y-2 w-[90vw] max-w-xs">
@@ -1419,7 +1594,7 @@ export default function OppositeExe() {
             <button onClick={startUpdate} className="w-full bg-indigo-600 text-white px-4 py-3 rounded-lg font-black uppercase text-sm">
               check for updates
             </button>
-            <button onClick={() => setTermsOpen(true)} className="w-full bg-zinc-700 text-white px-4 py-3 rounded-lg font-bold text-sm">
+            <button onClick={() => { setTermsOpen(true); spy(codeNameRef.current + " opened the terms. bold strategy."); }} className="w-full bg-zinc-700 text-white px-4 py-3 rounded-lg font-bold text-sm">
               read our terms (don&apos;t)
             </button>
             <button onClick={shareSite} className="w-full bg-pink-600 text-white px-4 py-3 rounded-lg font-black uppercase text-sm">
@@ -1510,6 +1685,10 @@ export default function OppositeExe() {
             onToggleFrozen={() => { setFrozen(ff => !ff); doJudgment(); }}
             onToggleSilenced={() => { const v = !silenced; setSilenced(v); silencedRef.current = v; doJudgment(); }}
             onSkipTerms={() => { setTermsAccept(true); doJudgment(); }}
+            pacifist={pacifist}
+            onTogglePacifist={() => { const v = !pacifist; setPacifist(v); pacifistRef.current = v; doJudgment(); }}
+            onTypeText={(msg) => { typeForMe(msg); doJudgment(); }}
+            onScrollPrison={() => { scrollPrison(); doJudgment(); }}
             onGag={onGag}
             onChaos={chaosLocal}
             notify={notifyJudged}
@@ -1520,6 +1699,7 @@ export default function OppositeExe() {
             <motion.button
               whileHover={{ scale: 1.1 }}
               whileTap={{ scale: 0.9 }}
+              data-no-flee
               onClick={handleRedButton}
               className="w-48 h-48 bg-red-600 rounded-full border-8 border-red-800 shadow-[0_20px_0_0_rgba(153,27,27,1)] active:shadow-none active:translate-y-4 transition-all flex items-center justify-center group"
             >

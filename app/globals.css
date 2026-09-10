@@ -28,3 +28,14 @@ body {
 .font-display {
   font-family: var(--font-display), sans-serif;
 }
+@keyframes quake-shake {
+  0% { transform: translate(0, 0); }
+  20% { transform: translate(-18px, 12px); }
+  40% { transform: translate(14px, -16px); }
+  60% { transform: translate(-12px, -8px); }
+  80% { transform: translate(16px, 14px); }
+  100% { transform: translate(0, 0); }
+}
+.quake-shake {
+  animation: quake-shake 0.25s infinite;
+}

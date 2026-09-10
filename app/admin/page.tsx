@@ -43,7 +43,7 @@ export default function Admin() {
     fetch("/api/config")
       .then((r) => r.json())
       .then(async (cfg) => {
-        if (dead || cfg.off) return;
+        if (dead || cfg.off || !cfg.key || !cfg.cluster) return;
         const Pusher = (await import("pusher-js")).default;
         if (dead) return;
         pusher = new Pusher(cfg.key, { cluster: cfg.cluster });
