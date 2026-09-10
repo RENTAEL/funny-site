@@ -196,6 +196,7 @@ export default function OppositeExe() {
   const [roomCount, setRoomCount] = useState(0);
   const [chatPh, setChatPh] = useState("ask anything...");
   const knownRef = useRef<Record<string, string>>({});
+  const seenAt = useRef<Record<string, number>>({});
   const lastAdminRef = useRef(0);
   const joinedAt = useRef(Date.now());
 
@@ -732,26 +733,28 @@ export default function OppositeExe() {
       vidRef.current = vid;
       try { sessionStorage.setItem("opp_vid", vid); } catch { /* no pocket */ }
       const started = Date.now();
-      const vis = sb.channel("visitors", { config: { private: false } });
+      const vis = sb.channel("visitors", { config: { private: false, presence: { key: vid } } });
       setSharedChannel("visitors", vis);
       const hello = () => { try { vis.track({ id: vid, name: nm, joinedAt: started, lastActive: Date.now() }); } catch (e) { console.log("[supabase] track failed", e); } };
       vis.on("presence", { event: "sync" }, () => {
         const state = vis.presenceState() as Record<string, Array<{ id: string; name: string }>>;
         const ids = Object.keys(state);
         console.log("[supabase] presence sync:", JSON.stringify(state));
-        setRoomCount(ids.length);
+        setRoomCount(new Set(ids.flatMap((k) => state[k].map((v) => v.id))).size);
         ids.forEach((k) => {
           const v = state[k][0];
           if (v && v.id && v.id !== vidRef.current && !knownRef.current[v.id]) {
             knownRef.current[v.id] = v.name;
+            seenAt.current[v.id] = Date.now();
             console.log("[supabase] presence join:", v.name);
             setChatMsgs((prev) => [...prev.slice(-29), { me: false, text: v.name + " joined the chat", k: "j" + v.id, name: "", at: Date.now() }]);
           }
         });
         Object.keys(knownRef.current).forEach((id) => {
-          if (ids.indexOf(id) < 0) {
+          if (ids.indexOf(id) < 0 && Date.now() - (seenAt.current[id] || 0) > 20000) {
             const nm2 = knownRef.current[id];
             delete knownRef.current[id];
+            delete seenAt.current[id];
             console.log("[supabase] presence leave:", nm2);
             setChatMsgs((prev) => [...prev.slice(-29), { me: false, text: nm2 + " fled", k: "f" + Date.now() + id.slice(-4), name: "", at: Date.now() }]);
           }
@@ -1767,7 +1770,7 @@ export default function OppositeExe() {
               </button>
             </div>
           </div>
-          <p className="text-center font-mono text-xs text-lime-400 mt-4"><span className="font-black">{heroUsers.toLocaleString()}</span> users and counting. mostly counting down.</p>
+          <p className="text-center font-mono text-xs text-lime-400 mt-4"><span className="font-black">{heroUsers.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",")}</span> users and counting. mostly counting down.</p>
           <div className="mt-6 text-xl font-bold bg-yellow-400 text-black py-1 overflow-hidden whitespace-nowrap rounded-xl border-4 border-black">
             <div className="inline-block animate-marquee-scroll">
               welcome to the worst experience of your life • please leave immediately • we know where you live • L + ratio •&nbsp;

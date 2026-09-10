@@ -13,13 +13,14 @@ victim.on("pageerror", (e) => logs.victim.push("[PAGEERROR] " + String(e.message
 await victim.goto(BASE, { waitUntil: "domcontentloaded" });
 await admin.goto(BASE, { waitUntil: "domcontentloaded" });
 await sleep(5000);
-const isOpen = () => admin.evaluate(() => document.body.innerText.includes("you have no power here"));
-for (let i = 0; i < 3; i++) {
+let opened = false;
+for (let i = 0; i < 6 && !opened; i++) {
   await admin.keyboard.type("letmein");
-  await sleep(2500);
-  if (await isOpen()) break;
+  try { await admin.getByRole("button", { name: "copy debug report" }).waitFor({ timeout: 5000 }); opened = true; } catch (e) {}
 }
-console.log("ADMIN PANEL OPEN: " + (await isOpen()));
+try { await admin.waitForFunction(() => document.body.innerText.includes("realtime: connected"), { timeout: 20000 }); opened = true; console.log("BADGE: connected"); } catch (e) { console.log("BADGE: not connected within 20s"); }
+console.log("ADMIN PANEL OPEN: " + opened);
+console.log("ADMIN PANEL OPEN: " + opened);
 try {
   await admin.getByRole("button", { name: "copy debug report" }).click({ timeout: 5000 });
   await sleep(1000);

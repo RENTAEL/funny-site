@@ -56,6 +56,7 @@ export default function AdminPanel(p: Props) {
   const [visitors, setVisitors] = useState<Record<string, Visitor>>({});
   const [visitorsRef, setVisitorsRef] = useState<Record<string, Visitor>>({});
   const vref = useRef<Record<string, Visitor>>({});
+  const seenAt = useRef<Record<string, number>>({});
   const [feed, setFeed] = useState<SpyMsg[]>([]);
   const [inbox, setInbox] = useState<SupportMsg[]>([]);
   const [replyText, setReplyText] = useState("");
@@ -137,13 +138,14 @@ export default function AdminPanel(p: Props) {
           const prev = vref.current;
           Object.keys(next).forEach((id) => {
             if (!prev[id]) {
+              seenAt.current[id] = Date.now();
               console.log("[supabase] admin presence join:", next[id].name);
               setFlashId(id);
               setTimeout(() => setFlashId((f) => (f === id ? null : f)), 2000);
             }
           });
           Object.keys(prev).forEach((id) => {
-            if (!next[id]) {
+            if (!next[id] && Date.now() - (seenAt.current[id] || 0) > 20000) {
               console.log("[supabase] admin presence leave:", prev[id].name);
               setFled((f) => ({ ...f, [id]: { name: prev[id].name, at: Date.now() } }));
               setTimeout(() => {
@@ -206,12 +208,15 @@ export default function AdminPanel(p: Props) {
         timers.push(setInterval(() => {
           setVisitors((prev) => {
             const now = Date.now();
-            console.log("[supabase] admin presence sync");
-            stage("sync received");
             const next: Record<string, Visitor> = {};
             Object.keys(prev).forEach((id) => {
               if (now - prev[id].lastActive < 30000) next[id] = prev[id];
             });
+            const dropped = Object.keys(prev).length - Object.keys(next).length;
+            if (dropped > 0) {
+              console.log("[supabase] sweep pruned stale visitors:", dropped);
+              stage("sweep pruned: " + dropped);
+            }
             return next;
           });
         }, 5000));
