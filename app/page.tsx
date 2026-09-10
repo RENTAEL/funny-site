@@ -13,6 +13,7 @@ import ExitLoop from "../components/ExitLoop";
 import Faq from "../components/Faq";
 import Testimonials from "../components/Testimonials";
 import AdminPanel from "../components/AdminPanel";
+import { setSharedChannel } from "@/utils/supabase/channels";
 // twMerge-import-replaced from 'tailwind-merge';
 
 function cn(...inputs: ClassValue[]) {
@@ -732,6 +733,7 @@ export default function OppositeExe() {
       try { sessionStorage.setItem("opp_vid", vid); } catch { /* no pocket */ }
       const started = Date.now();
       const vis = sb.channel("visitors", { config: { private: false } });
+      setSharedChannel("visitors", vis);
       const hello = () => { try { vis.track({ id: vid, name: nm, joinedAt: started, lastActive: Date.now() }); } catch (e) { console.log("[supabase] track failed", e); } };
       vis.on("presence", { event: "sync" }, () => {
         const state = vis.presenceState() as Record<string, Array<{ id: string; name: string }>>;

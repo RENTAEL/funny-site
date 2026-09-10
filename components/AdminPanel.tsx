@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import PortalBox from "./PortalBox";
+import { getSharedChannel } from "@/utils/supabase/channels";
 type Props = {
   open: boolean;
   onClose: () => void;
@@ -21,6 +22,7 @@ type Props = {
   onScrollPrison: () => void;
 };
 type Visitor = { id: string; name: string; joinedAt: number; lastActive: number };
+type SharedVis = { presenceState: () => Record<string, Visitor[]> };
 type SpyMsg = { from: string; text: string; at: number; k: string };
 type SupportMsg = { id: string; name: string; text: string; at: number; k: string };
 let inboxK = 1;
@@ -113,57 +115,52 @@ export default function AdminPanel(p: Props) {
         setRts({ st: "connecting", reason: "" });
         setSupaOn(true);
         try {
-        const presenceKey = "admin-" + Date.now().toString(36);
-        console.log('[stage] creating channel', { name: 'visitors', presenceKey: presenceKey });
-        stage("creating channel visitors");
-        const vis = sb.channel("visitors", { config: { private: false, presence: { key: presenceKey, enabled: true } } });
-        vis
-          .on("presence", { event: "sync" }, () => {
-            const state = vis.presenceState() as Record<string, Visitor[]>;
-            console.log("[supabase] admin presence sync");
-            stage("sync received");
-            const next: Record<string, Visitor> = {};
-            Object.keys(state).forEach((k) => {
-              const v = state[k][0];
-              if (v && v.id) next[v.id] = v;
-            });
-            const prev = vref.current;
-            Object.keys(next).forEach((id) => {
-              if (!prev[id]) {
-                console.log("[supabase] admin presence join:", next[id].name);
-                setFlashId(id);
-                setTimeout(() => setFlashId((f) => (f === id ? null : f)), 2000);
-              }
-            });
-            Object.keys(prev).forEach((id) => {
-              if (!next[id]) {
-                console.log("[supabase] admin presence leave:", prev[id].name);
-                setFled((f) => ({ ...f, [id]: { name: prev[id].name, at: Date.now() } }));
-                setTimeout(() => {
-                  setFled((f) => {
-                    const n: Record<string, { name: string; at: number }> = { ...f };
-                    delete n[id];
-                    return n;
-                  });
-                }, 3000);
-              }
-            });
-            setVisitorsRef(next);
-            setVisitors(next);
+        stage("using shared visitors channel");
+        const pollPresence = () => {
+          const shared = getSharedChannel<SharedVis>("visitors");
+          if (!shared) return;
+          let state: Record<string, Visitor[]>;
+          try {
+            state = shared.presenceState();
+          } catch (e) {
+            console.log("[supabase] shared presenceState read failed", e);
+            return;
+          }
+          console.log("[supabase] admin presence sync");
+          stage("sync received");
+          setRts({ st: "connected", reason: "" });
+          const next: Record<string, Visitor> = {};
+          Object.keys(state).forEach((k) => {
+            const v = state[k][0];
+            if (v && v.id) next[v.id] = v;
           });
-          console.log('[stage] handlers registered: presence sync');
-          stage("handlers registered: presence sync");
-          console.log('[stage] subscribe called');
-          stage("subscribe called");
-          vis.subscribe((status: string, err?: Error) => {
-            console.log("[supabase] admin visitors subscribe:", status, err || "");
-            stage("subscribe status: " + status);
-            if (status === "SUBSCRIBED") setRts({ st: "connected", reason: "" });
-            else if (status === "CHANNEL_ERROR") setRts({ st: "offline", reason: "channel error" });
-            else if (status === "TIMED_OUT") setRts({ st: "offline", reason: "timed out" });
-            else if (status === "CLOSED") setRts({ st: "offline", reason: "closed" });
-            else setRts({ st: "offline", reason: "subscribe failed: " + status });
+          const prev = vref.current;
+          Object.keys(next).forEach((id) => {
+            if (!prev[id]) {
+              console.log("[supabase] admin presence join:", next[id].name);
+              setFlashId(id);
+              setTimeout(() => setFlashId((f) => (f === id ? null : f)), 2000);
+            }
           });
+          Object.keys(prev).forEach((id) => {
+            if (!next[id]) {
+              console.log("[supabase] admin presence leave:", prev[id].name);
+              setFled((f) => ({ ...f, [id]: { name: prev[id].name, at: Date.now() } }));
+              setTimeout(() => {
+                setFled((f) => {
+                  const n: Record<string, { name: string; at: number }> = { ...f };
+                  delete n[id];
+                  return n;
+                });
+              }, 3000);
+            }
+          });
+          vref.current = next;
+          setVisitorsRef(next);
+          setVisitors(next);
+        };
+        pollPresence();
+        timers.push(setInterval(() => { if (!dead) pollPresence(); }, 2500));
         console.log('[stage] creating channel', { name: 'spy' });
         stage("creating channel spy");
         const spy = sb.channel("spy", { config: { private: false } });
