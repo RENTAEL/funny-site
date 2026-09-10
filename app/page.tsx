@@ -589,7 +589,6 @@ export default function OppositeExe() {
   }, []);
 
   useEffect(() => {
-  useEffect(() => {
     const onType = (e: KeyboardEvent) => {
       if (e.key.length !== 1) return;
       phraseBuf.current = (phraseBuf.current + e.key.toLowerCase()).slice(-30);
@@ -609,6 +608,7 @@ export default function OppositeExe() {
     return () => window.removeEventListener("keydown", closer);
   }, [adminOpen]);
 
+  useEffect(() => {
     const unlock = () => {
       try {
         const ctx = getAudio();
