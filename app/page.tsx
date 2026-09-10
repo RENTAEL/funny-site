@@ -8,6 +8,7 @@ import { twMerge } from 'tailwind-merge';
 import PortalBox from "../components/PortalBox";
 import Modal from "../components/Modal";
 import DodgeBuy from "../components/DodgeBuy";
+import AdminPanel from "../components/AdminPanel";
 // twMerge-import-replaced from 'tailwind-merge';
 
 function cn(...inputs: ClassValue[]) {
@@ -118,8 +119,6 @@ export default function OppositeExe() {
   const [adminOpen, setAdminOpen] = useState(false);
   const [frozen, setFrozen] = useState(false);
   const [silenced, setSilenced] = useState(false);
-  const [adminToast, setAdminToast] = useState("");
-  const [adminSpeak, setAdminSpeak] = useState("");
   const phraseBuf = useRef("");
   const logoTimes = useRef<number[]>([]);
   const deniedArmed = useRef(true);
@@ -951,6 +950,9 @@ export default function OppositeExe() {
     else if (g === "crt") setCrt(v => !v);
   };
 
+  const onGag = (g: string) => { fireLocalGag(g); doJudgment(); };
+  const sayLoud = (msg: string) => { if (msg.trim() === "") return; try { const u = new SpeechSynthesisUtterance(msg); u.rate = 0.9; u.pitch = 0.4; window.speechSynthesis.speak(u); } catch { /* robot is shy */ } doJudgment(); };
+  const notifyJudged = (msg: string) => { setToast(msg); setTimeout(() => setToast(null), 4000); doJudgment(); };
   const gravStyle = (i: number): React.CSSProperties => gravity
     ? { transform: `translateY(${30 + i * 28}px) rotate(${(i % 2 === 0 ? 1 : -1) * (5 + i * 2)}deg)` }
     : {};
@@ -1499,48 +1501,20 @@ export default function OppositeExe() {
             </div>
           </section>
 
-          {adminOpen && (
-            <PortalBox>
-              <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
-                <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setAdminOpen(false)} />
-                <div className="relative bg-slate-950 border-2 border-red-500 rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto p-5">
-                  <div className="flex items-center justify-between mb-1">
-                    <h2 className="font-black text-lg">admin panel. you have no power here.</h2>
-                    <button onClick={() => setAdminOpen(false)} className="font-black px-3 py-1 text-xl">X</button>
-                  </div>
-                  <p className="text-xs italic text-slate-500 mb-4">every button works. unfortunately.</p>
-                  <p className="text-xs font-bold uppercase text-slate-400 mb-2">trigger chaos</p>
-                  <div className="grid grid-cols-2 gap-2 mb-4">
-                    <button onClick={adminFire(handleRedButton)} className="bg-slate-800 rounded-xl p-3 text-xs font-black uppercase">spin</button>
-                    <button onClick={adminFire(() => setIsInverted(v => !v))} className="bg-slate-800 rounded-xl p-3 text-xs font-black uppercase">invert</button>
-                    <button onClick={adminFire(() => setGravity(v => !v))} className="bg-slate-800 rounded-xl p-3 text-xs font-black uppercase">gravity</button>
-                    <button onClick={adminFire(() => { setPrecision(true); setTimeout(() => setPrecision(false), 8000); })} className="bg-slate-800 rounded-xl p-3 text-xs font-black uppercase">drunk</button>
-                    <button onClick={adminFire(handleVbucks)} className="bg-slate-800 rounded-xl p-3 text-xs font-black uppercase">bsod</button>
-                    <button onClick={adminFire(startUpdate)} className="bg-slate-800 rounded-xl p-3 text-xs font-black uppercase">update</button>
-                    <button onClick={adminFire(() => confetti({ particleCount: 120, spread: 90 }))} className="bg-slate-800 rounded-xl p-3 text-xs font-black uppercase">confetti</button>
-                    <button onClick={adminFire(vineBoom)} className="bg-slate-800 rounded-xl p-3 text-xs font-black uppercase">boom</button>
-                    <button onClick={adminFire(() => setIsComicSans(v => !v))} className="bg-slate-800 rounded-xl p-3 text-xs font-black uppercase">comic</button>
-                    <button onClick={adminFire(() => setCrt(v => !v))} className="bg-slate-800 rounded-xl p-3 text-xs font-black uppercase">crt</button>
-                  </div>
-                  <div className="flex gap-2 mb-2">
-                    <input value={adminToast} onChange={(e) => setAdminToast(e.target.value)} placeholder="custom toast" className="flex-1 min-w-0 bg-slate-900 border border-slate-700 rounded-xl p-3 text-sm" />
-                    <button onClick={() => { if (adminToast.trim() === "") return; setToast(adminToast); setAdminToast(""); setTimeout(() => setToast(null), 4000); doJudgment(); }} className="bg-lime-400 text-black font-black text-xs uppercase rounded-xl px-4">send</button>
-                  </div>
-                  <div className="flex gap-2 mb-4">
-                    <input value={adminSpeak} onChange={(e) => setAdminSpeak(e.target.value)} placeholder="robot says..." className="flex-1 min-w-0 bg-slate-900 border border-slate-700 rounded-xl p-3 text-sm" />
-                    <button onClick={() => { if (adminSpeak.trim() === "") return; try { const u = new SpeechSynthesisUtterance(adminSpeak); u.rate = 0.9; u.pitch = 0.4; window.speechSynthesis.speak(u); } catch { /* robot is shy */ } setAdminSpeak(""); doJudgment(); }} className="bg-lime-400 text-black font-black text-xs uppercase rounded-xl px-4">speak</button>
-                  </div>
-                  <p className="text-xs font-bold uppercase text-slate-400 mb-2">god mode toggles</p>
-                  <div className="space-y-2 mb-4 text-sm font-bold">
-                    <button onClick={() => { setFrozen(f => !f); doJudgment(); }} className="w-full bg-slate-900 rounded-xl p-3 flex justify-between"><span>hold still (freeze dodging)</span><span>{frozen ? "ON" : "OFF"}</span></button>
-                    <button onClick={() => { const v = !silenced; setSilenced(v); silencedRef.current = v; doJudgment(); }} className="w-full bg-slate-900 rounded-xl p-3 flex justify-between"><span>silence (stop toasts + roasts)</span><span>{silenced ? "ON" : "OFF"}</span></button>
-                    <button onClick={() => { setTermsAccept(true); doJudgment(); }} className="w-full bg-slate-900 rounded-xl p-3 flex justify-between"><span>skip the terms (enable accept)</span><span>go</span></button>
-                  </div>
-                  <button onClick={chaosLocal} className="w-full bg-red-600 rounded-2xl p-4 font-black text-xl uppercase">CHAOS</button>
-                </div>
-              </div>
-            </PortalBox>
-          )}
+          <AdminPanel
+            open={adminOpen}
+            onClose={() => setAdminOpen(false)}
+            comic={comic}
+            frozen={frozen}
+            silenced={silenced}
+            onToggleFrozen={() => { setFrozen(ff => !ff); doJudgment(); }}
+            onToggleSilenced={() => { const v = !silenced; setSilenced(v); silencedRef.current = v; doJudgment(); }}
+            onSkipTerms={() => { setTermsAccept(true); doJudgment(); }}
+            onGag={onGag}
+            onChaos={chaosLocal}
+            notify={notifyJudged}
+            speak={sayLoud}
+          />
           <section className="col-span-1 md:col-span-2 flex flex-col items-center justify-center p-12 bg-red-900/20 rounded-3xl border-4 border-red-600 border-dashed">
             <h2 className="text-3xl font-black mb-8 uppercase italic text-red-500 animate-pulse">DO NOT PRESS</h2>
             <motion.button
