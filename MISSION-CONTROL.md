@@ -18,3 +18,5 @@ join/leave lines appear automatically, header shows live victim count, html rend
 the send button sometimes chickens out (10%) but messages always send. probably.
 admin sees the room feed in mission control, posts as "opposite.exe support team",
 can shadowban names (local hide only). nothing is stored anywhere. obviously.
+chat room runs on the "room" broadcast channel (event "msg": id, name, text, at).
+support dms use the "support" channel. admin presence heartbeat every 15s on "orders".
