@@ -76,13 +76,15 @@ export default function AdminPanel(p: Props) {
   }, []);
   useEffect(() => {
     try { setMyId(sessionStorage.getItem("opp_vid") || ""); } catch { /* no pocket */ }
-    stage("panel opened");
     if (!p.open) return;
+    stage("panel opened");
     let dead = false;
     const timers: ReturnType<typeof setInterval>[] = [];
+    stage("awaiting: config fetch");
     fetch("/api/config")
       .then((r) => r.json())
       .then(async (cfg) => {
+        stage("resolved: config fetch");
         if (dead) return;
         if (cfg.off || !cfg.supaUrl || !cfg.supaKey) {
           stage("config: env vars missing");
@@ -99,12 +101,22 @@ export default function AdminPanel(p: Props) {
         }
         if (dead) return;
         const sb = supaFn() as { removeAllChannels: () => void; channel: (n: string, opts?: object) => { subscribe: (cb?: (s: string) => void) => void; presenceState: () => Record<string, Array<{ id: string; name: string }>>; track: (o: object) => void; send: (m: object) => void; on: (t: string, f: object, cb: (m: { payload: never }) => void) => { subscribe: (cb?: (s: string) => void) => void } }; };
+        if (!sb) {
+          console.log("[supabase] client is null (browser env missing?)");
+          stage("client is null");
+          setRts({ st: "offline", reason: "env vars missing" });
+          return;
+        }
         sbRef.current = sb;
         stage("client created");
         timers.push(setTimeout(() => { setRts((r) => { if (r.st === "connected") return r; console.log("[supabase] watchdog: " + JSON.stringify(stagesRef.current)); return { st: "offline", reason: "subscribe timed out" }; }); }, 10000));
         setRts({ st: "connecting", reason: "" });
         setSupaOn(true);
-        const vis = sb.channel("visitors", { config: { private: false } });
+        try {
+        const presenceKey = "admin-" + Date.now().toString(36);
+        console.log('[stage] creating channel', { name: 'visitors', presenceKey: presenceKey });
+        stage("creating channel visitors");
+        const vis = sb.channel("visitors", { config: { private: false, presence: { key: presenceKey, enabled: true } } });
         vis
           .on("presence", { event: "sync" }, () => {
             const state = vis.presenceState() as Record<string, Visitor[]>;
@@ -138,8 +150,12 @@ export default function AdminPanel(p: Props) {
             });
             setVisitorsRef(next);
             setVisitors(next);
-          })
-          .subscribe((status: string, err?: Error) => {
+          });
+          console.log('[stage] handlers registered: presence sync');
+          stage("handlers registered: presence sync");
+          console.log('[stage] subscribe called');
+          stage("subscribe called");
+          vis.subscribe((status: string, err?: Error) => {
             console.log("[supabase] admin visitors subscribe:", status, err || "");
             stage("subscribe status: " + status);
             if (status === "SUBSCRIBED") setRts({ st: "connected", reason: "" });
@@ -148,6 +164,8 @@ export default function AdminPanel(p: Props) {
             else if (status === "CLOSED") setRts({ st: "offline", reason: "closed" });
             else setRts({ st: "offline", reason: "subscribe failed: " + status });
           });
+        console.log('[stage] creating channel', { name: 'spy' });
+        stage("creating channel spy");
         const spy = sb.channel("spy", { config: { private: false } });
         spy
           .on("broadcast", { event: "spy" }, (m: { payload: SpyMsg }) => {
@@ -156,6 +174,8 @@ export default function AdminPanel(p: Props) {
             setFeed((prev) => [...prev.slice(-29), { from: d.from, text: d.text, at: d.at, k: "a" + (inboxK++) }]);
           })
           .subscribe();
+        console.log('[stage] creating channel', { name: 'support' });
+        stage("creating channel support");
         const support = sb.channel("support", { config: { private: false } });
         support
           .on("broadcast", { event: "support-msg" }, (m: { payload: SupportMsg }) => {
@@ -164,6 +184,8 @@ export default function AdminPanel(p: Props) {
             setInbox((prev) => [...prev.slice(-49), { id: d.id, name: d.name, text: d.text, at: d.at, k: "a" + (inboxK++) }]);
           })
           .subscribe();
+        console.log('[stage] creating channel', { name: 'orders' });
+        stage("creating channel orders");
         const orders = sb.channel("orders", { config: { private: false } });
         orderSend.current = (to: string, gag: string, arg: string) => {
           try {
@@ -171,6 +193,16 @@ export default function AdminPanel(p: Props) {
           } catch { /* radio silence */ }
         };
         orders.subscribe();
+        console.log('[stage] handlers registered: broadcast spy, broadcast support-msg, broadcast command');
+        stage("handlers registered: spy, support, orders");
+        console.log('[stage] channel created');
+        stage("channel created");
+        } catch (err) {
+          const e = err as Error;
+          console.error('[stage] SETUP THREW:', e.message, e.stack);
+          stage("SETUP THREW: " + e.message);
+          setRts({ st: "offline", reason: "setup threw" });
+        }
         const alive = () => { if (orderSend.current) orderSend.current("all", "@alive", ""); };
         alive();
         timers.push(setInterval(alive, 15000));
@@ -187,7 +219,7 @@ export default function AdminPanel(p: Props) {
           });
         }, 5000));
       })
-      .catch(() => {});
+      .catch((err: unknown) => { const e = err as Error; console.error("[supabase] chain failed:", e.message, e.stack); stage("chain failed: " + e.message); setRts({ st: "offline", reason: "chain failed" }); });
     return () => {
       dead = true;
       timers.forEach((t) => clearInterval(t));
