@@ -228,9 +228,9 @@ export default function OppositeExe() {
           >
             OPPOSITE.EXE
           </motion.h1>
-          <marquee className="text-xl font-bold bg-yellow-400 text-black py-1">
+          <div className="text-xl font-bold bg-yellow-400 text-black py-1">
             welcome to the worst experience of your life • please leave immediately • we know where you live • L + ratio
-          </marquee>
+          </div>
         </header>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
@@ -363,3 +363,4 @@ export default function OppositeExe() {
     </div>
   );
 }
+
