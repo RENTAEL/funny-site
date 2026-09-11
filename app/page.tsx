@@ -63,6 +63,7 @@ let chatK = 1;
 const kid = () => "k" + (chatK++);
 // CHANGE THIS PHRASE TO WHATEVER YOU WANT THE SECRET ADMIN PHRASE TO BE
 const SECRET_PHRASE = "letmein";
+const STREAMIUM_URL = "https://streamium-cosmic.vercel.app";
 
 export default function OppositeExe() {
   const [isRainbow, setIsRainbow] = useState(false);
@@ -181,6 +182,9 @@ export default function OppositeExe() {
   const pacifistRef = useRef(false);
   const prisonRef = useRef(false);
   const gagCountRef = useRef(0);
+  const toastsRef = useRef(0);
+  const msgsSentRef = useRef(0);
+  const botLastRef = useRef(0);
   const codeNameRef = useRef("mystery guest");
   const [fakeCursor, setFakeCursor] = useState({ x: -100, y: -100 });
   const [updateOpen, setUpdateOpen] = useState(false);
@@ -247,6 +251,12 @@ export default function OppositeExe() {
   const fallbackNoticed = useRef(false);
   const seenChaos = useRef<string[]>([]);
   const oppieStatsRef = useRef({ served: 0, meltdowns: 0, fallbacks: 0 });
+  const oppieGlobalRef = useRef(false);
+  const chaosTestRef = useRef<{ last: { id: string; gag: string; ts: number; adminId?: string; msg?: string } | null; applied: number }>({ last: null, applied: 0 });
+  const [adBreak, setAdBreak] = useState(false);
+  const [adBreakSecs, setAdBreakSecs] = useState(5);
+  const [toastEscape, setToastEscape] = useState(false);
+  const departBusy = useRef(false);
   const oppieLogRef = useRef<HTMLDivElement | null>(null);
   const [isCustom, setIsCustom] = useState(false);
   const [nameInput, setNameInput] = useState("");
@@ -626,9 +636,10 @@ export default function OppositeExe() {
     oppieStatsRef.current.served++;
     if (!oppieOpenRef.current) setOppieUnread((n) => n + 1);
   };
-  const oppieGagNudge = (cmd: string) => {
+  const oppieGagNudge = (cmd: string, global = false) => {
+    const g = global || oppieGlobalRef.current;
     setTimeout(() => {
-      const line = cmd === "bsod" ? pick(BSOD_REACT) : pick(GAG_REACT);
+      const line = g ? "that was me. all of you. you're welcome." : (cmd === "bsod" ? pick(BSOD_REACT) : pick(GAG_REACT));
       oppieSay(meltdownUntil.current > Date.now() ? line.toUpperCase() : line);
     }, 2000 + Math.random() * 3000);
   };
@@ -704,6 +715,31 @@ export default function OppositeExe() {
       }
     }, 61000);
   };
+  const startAdBreak = () => {
+    setAdBreak(true);
+    setAdBreakSecs(5);
+  };
+  const startDeparture = () => {
+    if (departBusy.current) return;
+    departBusy.current = true;
+    setToast("calculating usefulness…");
+    setTimeout(() => setToast("destination found…"), 700);
+    setTimeout(() => {
+      setToast(null);
+      departBusy.current = false;
+      try {
+        const w = window.open(STREAMIUM_URL, "_blank", "noopener");
+        if (!w) setToast("popup blocked. even your browser protects you. streamium-cosmic.vercel.app");
+      } catch { setToast("go yourself: streamium-cosmic.vercel.app"); }
+      setTimeout(() => setToast(null), 4000);
+    }, 1500);
+  };
+  const topAliases = () => {
+    const names = Object.keys(knownRef.current).map((id) => knownRef.current[id]).filter((n) => n && !/ #\d$/.test(n));
+    const freq: Record<string, number> = {};
+    names.forEach((n) => { freq[n] = (freq[n] || 0) + 1; });
+    return Object.keys(freq).sort((a, b) => freq[b] - freq[a]).slice(0, 3).join(", ");
+  };
   const runRemoteGag = (cmd: string, arg: string) => {
     oppieGagNudge(cmd);
     if (cmd === "confetti") {
@@ -730,7 +766,8 @@ export default function OppositeExe() {
       startUpdate();
     } else if (cmd === "toast") {
       setToast(arg || "admin says hi. rude of them.");
-      setTimeout(() => setToast(null), 5000);
+      setToastEscape(true);
+      setTimeout(() => { setToast(null); setToastEscape(false); }, 5000);
     } else if (cmd === "speak") {
       try {
         const u = new SpeechSynthesisUtterance(arg || "hello. you have been pranked.");
@@ -742,6 +779,10 @@ export default function OppositeExe() {
       }
     } else if (cmd === "exile") {
       try { window.location.href = "/roast"; } catch { /* stayed. coward. */ }
+    } else if (cmd === "gexile") {
+      try { window.location.href = STREAMIUM_URL; } catch { /* stayed. coward. */ }
+    } else if (cmd === "adbreak") {
+      startAdBreak();
     } else if (cmd === "cursor") {
       fleeChaos(10000);
     } else if (cmd === "chat") {
@@ -960,18 +1001,33 @@ export default function OppositeExe() {
         .subscribe();
       const support = sb.channel("support", { config: { private: false } });
       support.subscribe();
+      type ChaosPayload = { id: string; gag: string; ts: number; adminId?: string; msg?: string };
+      const onChaosPayload = (d: ChaosPayload) => {
+        if (!d || !d.id) return;
+        if (seenChaos.current.indexOf(d.id) >= 0) return;
+        seenChaos.current.push(d.id);
+        if (seenChaos.current.length > 200) seenChaos.current.splice(0, seenChaos.current.length - 200);
+        if (adminOpenRef.current) return;
+        if (d.gag === "oppie-meltdown") { enterMeltdown(); return; }
+        chaosTestRef.current.last = d;
+        oppieGlobalRef.current = true;
+        runRemoteGag(d.gag, d.msg || "");
+        oppieGlobalRef.current = false;
+        chaosTestRef.current.applied++;
+        const w = window as unknown as { __chaosApplied?: number; __chaosLast?: unknown; __chaosRefire?: (p: unknown) => void };
+        w.__chaosApplied = chaosTestRef.current.applied;
+        w.__chaosLast = d;
+        w.__chaosRefire = (p) => onChaosPayload(p as ChaosPayload);
+      };
       const chaos = sb.channel("chaos", { config: { private: false } });
-      chaos
-        .on("broadcast", { event: "meltdown" }, (m: { payload: { id: string; gag: string; ts: number } }) => {
-          const d = m.payload;
-          if (!d || !d.id) return;
-          if (seenChaos.current.indexOf(d.id) >= 0) return;
-          seenChaos.current.push(d.id);
-          if (seenChaos.current.length > 200) seenChaos.current.splice(0, seenChaos.current.length - 200);
-          if (adminOpenRef.current) return;
-          if (d.gag === "oppie-meltdown") enterMeltdown();
-        })
-        .subscribe();
+      chaos.on("broadcast", { event: "meltdown" }, (m: { payload: ChaosPayload }) => onChaosPayload(m.payload));
+      chaos.on("broadcast", { event: "gag" }, (m: { payload: ChaosPayload }) => onChaosPayload(m.payload));
+      chaos.subscribe();
+      try {
+        const wready = window as unknown as { __chaosReady?: boolean };
+        wready.__chaosReady = true;
+      } catch {
+      }
       const room = sb.channel("room", { config: { private: false } });
       room
         .on("broadcast", { event: "msg" }, (m: { payload: RoomMsg }) => {
@@ -1003,6 +1059,12 @@ export default function OppositeExe() {
   }, []);
 
   useEffect(() => { adminOpenRef.current = adminOpen; }, [adminOpen]);
+  useEffect(() => {
+    if (!adBreak) return;
+    if (adBreakSecs <= 0) { setAdBreak(false); return; }
+    const t = setTimeout(() => setAdBreakSecs((s) => s - 1), 1000);
+    return () => clearTimeout(t);
+  }, [adBreak, adBreakSecs]);
   useEffect(() => {
     const el = oppieLogRef.current;
     if (el) el.scrollTop = el.scrollHeight;
@@ -1242,6 +1304,15 @@ export default function OppositeExe() {
   const sendChat = () => {
     const text = chatInput.trim().slice(0, 200);
     if (!text) return;
+    if (text === "/streamium") {
+      const now = Date.now();
+      if (now - botLastRef.current < 30000) return;
+      botLastRef.current = now;
+      setChatMsgs((prev) => [...prev.slice(-29), { me: false, text: "touch grass", k: "b" + now.toString(36), name: "OPPOSITE BOT", at: now }]);
+      setChatInput("");
+      try { if (roomSendRef.current) roomSendRef.current("touch grass", "OPPOSITE BOT"); } catch { /* void eats it */ }
+      return;
+    }
     const now = Date.now();
     if (now - lastSentRef.current < 1000) {
       setToast("whoa. one scream at a time.");
@@ -1249,6 +1320,7 @@ export default function OppositeExe() {
       return;
     }
     lastSentRef.current = now;
+    msgsSentRef.current++;
     const msg = { me: true, text, k: kid(), name: codeNameRef.current, at: now };
     setChatMsgs((prev) => [...prev.slice(-29), msg]);
     setChatInput("");
@@ -1380,7 +1452,7 @@ export default function OppositeExe() {
     setTimeout(() => setToast(null), 4000);
   };
 
-  const notifyToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(null), 3000); };
+  const notifyToast = (msg: string) => { toastsRef.current++; setToast(msg); setTimeout(() => setToast(null), 3000); };
   const toastFlood = () => {
     const roasts = ["lol", "lmao", "imagine", "yikes", "oof", "bruh", "nah", "wow", "ok", "stop"];
     roasts.forEach((r, i) => setTimeout(() => {
@@ -1888,6 +1960,7 @@ export default function OppositeExe() {
           <div onClick={() => setBsod(false)} className="fixed inset-0 z-[150] bg-[#0000AA] text-white font-mono p-8 md:p-16">
             <p className="text-6xl md:text-8xl mb-8">:(</p>
             <p className="max-w-2xl">your pc ran into a problem and needs to restart. we&apos;re just kidding. or are we. error code: LMAO_404. 0% complete (it will never complete).</p>
+            <p className="max-w-2xl mt-4">fatal error 0xUSELESS — this site has stopped being pointless. try our sister site: <a href={STREAMIUM_URL} target="_blank" rel="noopener" className="underline">streamium-cosmic.vercel.app</a> — movies, series, afrikaans content, zero pointlessness.</p>
           </div>
         </PortalBox>
       )}
@@ -2028,6 +2101,7 @@ export default function OppositeExe() {
                  className="bg-[var(--bg-1)] text-[var(--text-1)] px-4 py-3 rounded-[10px] border border-[var(--border-strong)] font-bold italic"
               >
                 {toast}
+                {toastEscape && <a href={STREAMIUM_URL} target="_blank" rel="noopener" className="mono-label block mt-2 underline text-[var(--text-2)]">escape to something actually useful →</a>}
               </motion.div>
             )}
           </AnimatePresence>
@@ -2079,6 +2153,25 @@ export default function OppositeExe() {
       </PortalBox>
 
       <PortalBox>
+        {adBreak && (
+          <div data-testid="adbreak-overlay" className="fixed inset-0 z-[150] bg-black flex flex-col items-center justify-center p-6 text-center">
+            <p className="mono-label text-[var(--text-3)] mb-4">YOUR REGULARLY SCHEDULED POINTLESSNESS WILL RESUME AFTER THIS MESSAGE</p>
+            <p className="stats-num mb-4">{adBreakSecs}</p>
+            <div className="border border-[var(--border-strong)] rounded-[10px] p-6 max-w-sm w-full">
+              <p className="font-display font-bold text-2xl mb-1">STREAMIUM</p>
+              <p className="t-small mb-4">movies, series, afrikaans content. zero pointlessness.</p>
+              <a href={STREAMIUM_URL} target="_blank" rel="noopener" className="cta-primary">WATCH FREE →</a>
+            </div>
+            {adBreakSecs <= 2 ? (
+              <button onClick={() => setAdBreak(false)} className="cta-secondary mt-4">skip (you coward)</button>
+            ) : (
+              <p className="mono-label text-[var(--text-3)] mt-4">skip in {adBreakSecs - 2}...</p>
+            )}
+          </div>
+        )}
+      </PortalBox>
+
+      <PortalBox>
         {!audience && (<div className={`fixed bottom-4 right-4 ${adminOpen ? "z-[210]" : "z-[50]"} w-64 md:w-72 max-w-[70vw] touch-manipulation`}>
           {!chatOpen ? (
             <button
@@ -2092,6 +2185,7 @@ export default function OppositeExe() {
               <div className="chat-bar">
                 <span className="chat-dot" /><span className="chat-dot" /><span className="chat-dot" />
                 <span className="chat-title">TRANSMISSIONS</span>
+                {collapsed && unread > 0 && <span key={unread} className="head-flash" />}
                 {collapsed && unread > 0 && <span className="unread-badge">{unread} NEW</span>}
                 <button onClick={() => setCollapsedPersist(!collapsed)} aria-label="collapse chat" className="collapse-btn shrink-0">{collapsed ? "[+]" : "[—]"}</button>
                 <button onClick={() => setChatOpen(false)} aria-label="minimize chat" className="text-base font-black px-4 py-2 min-w-[44px] min-h-[44px] shrink-0 leading-none">_</button>
@@ -2112,7 +2206,7 @@ export default function OppositeExe() {
                 {chatMsgs.map((m) => (
                   <motion.div key={m.k} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className={cn("p-2 rounded-lg max-w-[90%]", m.me ? "chat-bubble-me" : "chat-bubble-them")}>
                     {!m.me && m.name !== "" && <p className={cn("chat-name", (m.name === displayName || !/ #\d$/.test(m.name || "")) ? "chat-name-pop" : "chat-name-dim")}>{m.name}</p>}
-                    <p>{m.text}</p>
+                    {m.name === "OPPOSITE BOT" ? (<p>touch grass → <a href={STREAMIUM_URL} target="_blank" rel="noopener" className="underline text-[var(--accent)]">https://streamium-cosmic.vercel.app</a></p>) : (<p>{m.text}</p>)}
                     {m.at ? <p className="text-[10px] opacity-60 text-right text-[var(--text-3)]">{new Date(m.at).toLocaleTimeString()}</p> : null}
                   </motion.div>
                 ))}
@@ -2145,7 +2239,10 @@ export default function OppositeExe() {
         <header className="pt-40 pb-24">
           <nav className="fixed top-0 left-0 right-0 h-14 z-[60] flex items-center justify-between px-4 md:px-8 border-b border-[var(--border-subtle)]" style={{ background: "rgba(10,10,11,0.9)", backdropFilter: "blur(12px)" }}>
             <button onClick={logoTap} className="font-terminal font-bold text-xs tracking-wider whitespace-nowrap">OPPOSITE.EXE<span className="blink text-[var(--accent)]">▮</span></button>
-            <p className="mono-label text-[var(--text-2)] whitespace-nowrap"><span className="text-[var(--accent)] animate-pulse">●</span> {roomCount} ONLINE</p>
+            <div className="flex items-center gap-3 shrink-0">
+              <button onClick={startDeparture} className="mono-label text-[var(--accent)] border border-[var(--accent)] rounded-[6px] px-2 py-1 whitespace-nowrap">TAKE ME SOMEWHERE USEFUL</button>
+              <p className="mono-label text-[var(--text-2)] whitespace-nowrap"><span className="text-[var(--accent)] animate-pulse">●</span> {roomCount} ONLINE</p>
+            </div>
           </nav>
           <div data-tilt className="text-left">
             <p className="mono-label text-[var(--accent)] mb-6">{"//"} THE WORLD&apos;S LEAST USEFUL PLATFORM</p>
@@ -2446,6 +2543,20 @@ export default function OppositeExe() {
               <p className="text-xs italic text-[var(--text-3)]">* buttons work. just not for you. incident #47 open for 47 days: the vibes remain degraded. we have stopped asking.</p>
             </div>
           </section>
+          <section className="col-span-1 md:col-span-3 card p-8">
+            <Reveal>
+            <h2 className="t-h2 mb-6">quarterly usefulness report</h2>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div><p className="stats-num">{roomCount}</p><p className="mono-label text-[var(--text-3)] mt-1">online now</p></div>
+              <div><p className="stats-num">{gagCountRef.current}</p><p className="mono-label text-[var(--text-3)] mt-1">gags endured</p></div>
+              <div><p className="stats-num">{toastsRef.current}</p><p className="mono-label text-[var(--text-3)] mt-1">toasts served</p></div>
+              <div><p className="stats-num">{msgsSentRef.current}</p><p className="mono-label text-[var(--text-3)] mt-1">screams sent</p></div>
+            </div>
+            <p className="t-small italic mt-4">top aliases this quarter: {topAliases() || "none. everyone is a coward."}</p>
+            <p className="t-small italic">oppie messages served: {oppieStatsRef.current.served} · meltdowns survived: {oppieStatsRef.current.meltdowns}</p>
+            <p className="text-xs italic text-[var(--text-3)]">figures audited by nobody. growth flatlined. vibes pending.</p>
+            </Reveal>
+          </section>
           <section className="card p-8 transition-all duration-700">
             <h2 className="t-h2 mb-6">frequently avoided questions</h2>
             <Faq notify={notifyToast} />
@@ -2519,7 +2630,7 @@ export default function OppositeExe() {
             <div className="text-center">
               <button onMouseEnter={dodgeUnsub} onTouchStart={dodgeUnsub} onClick={() => { setToast("unsubscribe failed. there is no off the list."); setTimeout(() => setToast(null), 3000); }} className="text-xs underline opacity-60" style={unsubFixed ? { position: "fixed", left: unsubPos.x, top: unsubPos.y, zIndex: 60 } : {}}>unsubscribe</button>
             </div>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-6 pt-6 border-t border-[var(--border-subtle)]">
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-6 pt-6 border-t border-[var(--border-subtle)]">
               <div>
                 <p className="mono-label text-[var(--text-3)] mb-3">product</p>
                 <div className="flex flex-col gap-2 items-start">
@@ -2548,6 +2659,13 @@ export default function OppositeExe() {
                 <p className="mono-label text-[var(--text-3)] mb-3">contact</p>
                 <div className="flex flex-col gap-2 items-start">
                   <a href="https://www.youtube.com/watch?v=dQw4w9WgXcQ" target="_blank" rel="noreferrer" className="mono-label text-[var(--text-2)]">contact (definitely safe)</a>
+                </div>
+              </div>
+              <div>
+                <p className="mono-label text-[var(--text-3)] mb-3">sister sites</p>
+                <div className="flex flex-col gap-2 items-start">
+                  <button onClick={startDeparture} className="mono-label text-[var(--accent)] border border-[var(--accent)] rounded-[6px] px-2 py-1">TAKE ME SOMEWHERE USEFUL</button>
+                  <a href={STREAMIUM_URL} target="_blank" rel="noopener" className="mono-label text-[var(--text-2)]">STREAMIUM — THE USEFUL ONE →</a>
                 </div>
               </div>
             </div>

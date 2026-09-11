@@ -217,6 +217,7 @@ body {
 }
 .chat-bar {
   background: var(--bg-2);
+  position: relative;
   height: 36px;
   display: flex;
   align-items: center;
@@ -312,6 +313,18 @@ body {
 }
 .chat-fold.folded { grid-template-rows: 0fr; }
 .chat-fold-inner { overflow: hidden; min-height: 0; }
+.head-flash {
+  position: absolute;
+  inset: 0;
+  border: 1px solid var(--accent);
+  border-radius: inherit;
+  pointer-events: none;
+  animation: headflash 1s var(--ease-out) 1;
+}
+@keyframes headflash {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
 .oppie-pill {
   position: fixed;
   left: 1rem;

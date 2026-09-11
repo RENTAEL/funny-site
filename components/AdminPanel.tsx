@@ -71,7 +71,14 @@ export default function AdminPanel(p: Props) {
   const [tick, setTick] = useState(0);
   const countsRef = useRef<Record<string, number>>({});
   const orderSend = useRef<((to: string, gag: string, arg: string, nonce: string) => void) | null>(null);
-  const chaosSend = useRef<((payload: { id: string; gag: string; ts: number; adminId: string }) => void) | null>(null);
+  const chaosSend = useRef<((payload: { id: string; gag: string; ts: number; adminId: string; msg?: string }, event?: string) => void) | null>(null);
+  const [globalToast, setGlobalToast] = useState("");
+  const [globalLog, setGlobalLog] = useState<Array<{ id: string; text: string; at: number; n: number }>>([]);
+  const globalCounts = useRef<Record<string, number>>({});
+  const globalFiredRef = useRef(0);
+  const lastFired = useRef<Record<string, number>>({});
+  const lastAck = useRef<Record<string, number>>({});
+  const nonceTarget = useRef<Record<string, string>>({});
   const stagesRef = useRef<string[]>([]);
   const stage = (s: string) => { stagesRef.current.push(new Date().toLocaleTimeString() + " " + s); };
   const [showReport, setShowReport] = useState(false);
@@ -203,12 +210,14 @@ export default function AdminPanel(p: Props) {
           .on("broadcast", { event: "ack" }, (m: { payload: { nonce: string } }) => {
             const d = m.payload;
             if (!d || !d.nonce) return;
+            const to = nonceTarget.current[d.nonce];
+            if (to && to !== "all") lastAck.current[to] = Date.now();
             setFireLog((prev) => prev.map((fl) => (fl.nonce === d.nonce ? { ...fl, ok: true } : fl)));
           })
           .subscribe();
         const chaos = sb.channel("chaos", { config: { private: false } });
-        chaosSend.current = (payload) => {
-          try { chaos.send({ type: "broadcast", event: "meltdown", payload }); } catch { /* quiet */
+        chaosSend.current = (payload, event) => {
+          try { chaos.send({ type: "broadcast", event: event || "meltdown", payload }); } catch { /* quiet */
           }
         };
         chaos.subscribe();
@@ -253,6 +262,7 @@ export default function AdminPanel(p: Props) {
   const sendOrder = (to: string, gag: string, arg: string) => {
     const nonce = "n" + Date.now().toString(36) + Math.floor(Math.random() * 1e6).toString(36);
     if (orderSend.current) orderSend.current(to, gag, arg, nonce);
+    nonceTarget.current[nonce] = to;
     const nm = to === "all" ? "EVERYONE" : (vref.current[to] ? vref.current[to].name : to);
     setFireLog((prev) => [...prev.slice(-19), { nonce: nonce, text: "fired " + gag + " at " + nm, at: Date.now(), ok: false }]);
     setTimeout(() => { setFireLog((prev) => prev.map((fl) => (fl.nonce === nonce && !fl.ok ? { ...fl, text: fl.text + " -- no confirmation, target may have fled" } : fl))); }, 8000);
@@ -269,6 +279,33 @@ export default function AdminPanel(p: Props) {
     if (chaosSend.current) chaosSend.current(payload);
     setFireLog((prev) => [...prev.slice(-19), { nonce: payload.id, text: "→ broadcast oppie-meltdown", at: Date.now(), ok: true }]);
     setTick((n) => n + 1);
+  };
+  const fireGlobal = (gag: string, label: string, msg?: string) => {
+    const payload = { id: "g" + Date.now().toString(36) + Math.floor(Math.random() * 1e6).toString(36), gag, ts: Date.now(), adminId: myId, msg: msg || "" };
+    if (chaosSend.current) chaosSend.current(payload, "gag");
+    globalCounts.current[gag] = (globalCounts.current[gag] || 0) + 1;
+    globalFiredRef.current++;
+    lastFired.current[gag] = Date.now();
+    setGlobalLog((prev) => [...prev.slice(-9), { id: payload.id, text: "→ broadcast " + label + (msg ? ": '" + msg + "'" : ""), at: Date.now(), n: globalCounts.current[gag] }]);
+    setTick((n) => n + 1);
+  };
+  const copyUsefulness = async () => {
+    const targeted = Object.keys(countsRef.current).reduce((a, id) => a + countsRef.current[id], 0);
+    let served = 0;
+    let meltdowns = 0;
+    try {
+      const w = window as unknown as { __oppieStats?: { served: number; meltdowns: number } };
+      if (w.__oppieStats) { served = w.__oppieStats.served; meltdowns = w.__oppieStats.meltdowns; }
+    } catch { /* shy */
+    }
+    const rep = JSON.stringify({ online: list.length, targetedFired: targeted, globalFired: globalFiredRef.current, shots: fireLog.length, screams: inbox.length, oppie_messages_served: served, oppie_meltdowns_triggered: meltdowns, at: new Date().toISOString() });
+    console.log(rep);
+    try {
+      await navigator.clipboard.writeText(rep);
+      p.notify("usefulness copied. spend it wisely.");
+    } catch {
+      setShowReport(true);
+    }
   };
   const buildReport = () => {
     const lines = [
@@ -343,6 +380,7 @@ export default function AdminPanel(p: Props) {
               {rts.st === "connected" ? (<><span className="w-2 h-2 rounded-full bg-[var(--accent)] animate-pulse" /><span>realtime: connected</span></>) : rts.st === "connecting" ? (<><span className="w-2 h-2 rounded-full bg-[var(--text-3)] animate-pulse" /><span>realtime: connecting...</span></>) : (<><span className="w-2 h-2 rounded-full bg-red-500" /><span>realtime: offline{rts.reason !== "" ? ": " + rts.reason : ""}</span></>)}
             </p>
             <button onClick={copyReport} className="term-copy w-full bg-[var(--bg-2)] rounded-[6px] p-2 mono-label text-center mb-2">copy debug report</button>
+            <button onClick={copyUsefulness} className="term-copy w-full bg-[var(--bg-2)] rounded-[6px] p-2 mono-label text-center mb-2">copy usefulness report</button>
             {showReport && (<div className="term-chrome mb-2"><div className="term-bar"><i /><i /><i /><span className="term-title">debug-report.log</span></div><pre className="text-[11px] bg-black text-[var(--text-2)] p-2 overflow-x-auto whitespace-pre-wrap font-terminal" style={{ userSelect: "all" }}>{buildReport().split("\\n").map((l, i) => (
               <span key={i} className={/threw|failed|error|offline|missing|timed out/i.test(l) ? "stage-bad" : /resolved|received|registered|created|connected|ok|delivered/i.test(l) ? "stage-ok" : undefined}>{l}{"\n"}</span>
             ))}</pre></div>)}
@@ -355,17 +393,40 @@ export default function AdminPanel(p: Props) {
                 {rts.st === "connected" && list.length <= 1 && (<p className="text-xs italic text-[var(--text-3)] mt-1">only you. lonely.</p>)}
                 <button onClick={() => setExpanded(expanded === "all" ? null : "all")} className="w-full bg-[var(--bg-2)] border border-[var(--danger)] text-[var(--danger)] rounded-[6px] p-2 mono-label mb-2 text-center">fire at everyone {expanded === "all" ? "-" : "+"}</button>
                 {expanded === "all" && fireMenu("all")}
+                <div data-testid="global-menu" className="border border-[var(--accent)] rounded-[6px] p-2 mb-2 mt-2">
+                  <p className="mono-label text-[var(--accent)] mb-2">[◍] GLOBAL — HIT EVERYONE</p>
+                  <div className="grid grid-cols-3 gap-1 mb-2">
+                    {[["invert", "invert"], ["bsod", "bsod"], ["cursor", "cursor"], ["adbreak", "adbreak"], ["gexile", "GLOBAL EXILE (EVERYONE GETS STREAMED)"]].map(([g, label]) => (
+                      <div key={g}>
+                        <button onClick={() => fireGlobal(g, label)} className="w-full bg-[var(--bg-2)] border border-[var(--border-strong)] rounded-[6px] p-2 min-h-[44px] mono-label arsenal-btn">{label}</button>
+                        <p className="mono-label text-[var(--text-3)] mt-1">×{globalCounts.current[g] || 0}{lastFired.current[g] ? " · " + new Date(lastFired.current[g]).toLocaleTimeString() : ""}</p>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="flex gap-1 mb-1">
+                    <input data-testid="global-toast" value={globalToast} onChange={(e) => setGlobalToast(e.target.value)} placeholder="global toast..." className="flex-1 min-w-0 bg-[var(--bg-2)] border border-[var(--border-subtle)] rounded-[6px] p-2 text-base" />
+                    <button onClick={() => { fireGlobal("toast", "toast", globalToast.trim() === "" ? "update available" : globalToast); setGlobalToast(""); }} className="bg-[var(--accent)] text-[#0A0A0B] font-bold mono-label rounded-[6px] px-3">send</button>
+                  </div>
+                  {globalLog.length > 0 && (
+                    <div className="space-y-1">
+                      {globalLog.slice(-5).reverse().map((gl) => (
+                        <p key={gl.id} className="text-[11px]"><span className="text-[var(--text-3)]">{new Date(gl.at).toLocaleTimeString()} </span>{gl.text} <span className="text-[var(--accent)]">×{gl.n}</span></p>
+                      ))}
+                    </div>
+                  )}
+                </div>
                 <div onClick={(e) => { if (e.target === e.currentTarget) setExpanded(null); }} className="space-y-2 mt-2 max-h-64 overflow-y-auto overscroll-contain">
                   {list.map((v) => {
                     const idleS = Math.floor((now - v.lastActive) / 1000);
                     const idle = idleS > 60;
                     const fresh = flashId === v.id;
+                    const recovering = Date.now() - (lastAck.current[v.id] || 0) < 10000;
                     return (
                       <motion.div key={v.id} initial={fresh ? { x: 60, opacity: 0, backgroundColor: "#365314" } : false} animate={{ x: 0, opacity: 1, backgroundColor: "rgba(0,0,0,0)" }} transition={{ duration: 0.4 }}>
                         <button onClick={() => setExpanded(expanded === v.id ? null : v.id)} className={`vic-card w-full text-left ${idle ? "opacity-60" : ""}`}>
                           <span className="flex items-center gap-2">
                             <span className="w-2 h-2 rounded-full bg-[var(--accent)] animate-pulse shrink-0" />
-                            <span className={v.custom ? "font-bold text-base vic-custom" : "font-bold text-base italic opacity-70"}>{v.name}{v.id === myId ? " (you)" : ""}{!v.custom && <span className="ml-2 text-[10px] not-italic border border-[var(--border-strong)] text-[var(--text-3)] px-1 rounded-[3px]">NPC ENERGY</span>}</span>
+                            <span className={v.custom ? "font-bold text-base vic-custom" : "font-bold text-base italic opacity-70"}>{v.name}{v.id === myId ? " (you)" : ""}{recovering && <span className="ml-2 text-[10px] border border-[var(--accent)] text-[var(--accent)] px-1 rounded-[3px]">RECOVERING</span>}{!v.custom && <span className="ml-2 text-[10px] not-italic border border-[var(--border-strong)] text-[var(--text-3)] px-1 rounded-[3px]">NPC ENERGY</span>}</span>
                           </span>
                           <span className="block mt-1 space-y-0.5">
                             <span className="block text-[11px]"><span className="lbl">status </span><span className="text-[11px] text-[var(--text-1)]">{idle ? "idle " + rel(v.lastActive, now) : "active " + rel(v.lastActive, now)}</span> <span className="text-[var(--text-3)]">ref {v.id.slice(0, 6)}</span></span>
@@ -411,9 +472,13 @@ export default function AdminPanel(p: Props) {
             </div>
           </Section>
           <Section id="chaos" title="chaos triggers" shut={shut} onFlip={flip}>
+            <p className="mono-label text-[var(--text-3)] mb-2">{GAGS.length} gags loaded · local mischief only</p>
             <div className="grid grid-cols-2 gap-2">
               {GAGS.map((g) => (
-                <button key={g} onClick={() => p.onGag(g)} className="bg-[var(--bg-2)] border border-[var(--border-strong)] rounded-[6px] p-3 mono-label arsenal-btn">{g}</button>
+                <div key={g}>
+                  <button onClick={() => { lastFired.current["local-" + g] = Date.now(); p.onGag(g); setTick((n) => n + 1); }} className="w-full bg-[var(--bg-2)] border border-[var(--border-strong)] rounded-[6px] p-3 mono-label arsenal-btn">{g}</button>
+                  {lastFired.current["local-" + g] ? (<p className="mono-label text-[var(--text-3)] mt-1">{new Date(lastFired.current["local-" + g]).toLocaleTimeString()}</p>) : null}
+                </div>
               ))}
             </div>
             <button onClick={fireMeltdown} className="w-full mt-2 bg-[var(--bg-2)] border border-[var(--accent)] text-[var(--accent)] rounded-[6px] p-3 mono-label arsenal-btn">[◍] OPPIE MELTDOWN</button>
