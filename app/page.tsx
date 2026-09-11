@@ -1901,19 +1901,21 @@ export default function OppositeExe() {
               <div className="chat-bar">
                 <span className="chat-dot" /><span className="chat-dot" /><span className="chat-dot" />
                 <span className="chat-title">TRANSMISSIONS</span>
+                {collapsed && unread > 0 && <span className="unread-badge">{unread} NEW</span>}
+                <button onClick={() => setCollapsedPersist(!collapsed)} aria-label="collapse chat" className="collapse-btn shrink-0">{collapsed ? "[+]" : "[—]"}</button>
+                <button onClick={() => setChatOpen(false)} aria-label="minimize chat" className="text-base font-black px-4 py-2 min-w-[44px] min-h-[44px] shrink-0 leading-none">_</button>
+              </div>
               {displayName !== "" && (
-                <div className="px-2 py-1 flex gap-1 items-center bg-[var(--bg-0)] border border-[var(--border-subtle)] rounded-[6px] text-xs min-w-0 shrink-0">
+                <div className="px-2 py-1.5 border-b border-[var(--border-subtle)]">
+                <div className="px-2 py-1 flex gap-1 items-center bg-[var(--bg-0)] border border-[var(--border-subtle)] rounded-[6px] text-xs min-w-0">
                   {isCustom ? (
                     <><span className="truncate">you are <b>{displayName}</b></span><button onClick={resetName} className="underline shrink-0">reset</button></>
                   ) : (
                     <><input value={nameInput} onChange={(e) => setNameInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { setName(nameInput); setNameInput(""); } }} placeholder="call yourself something" maxLength={30} className="w-24 bg-transparent text-xs p-1 outline-none" /><button onClick={() => { setName(nameInput); setNameInput(""); }} className="font-bold shrink-0">set</button></>
                   )}
                 </div>
+                </div>
               )}
-                {collapsed && unread > 0 && <span className="unread-badge">{unread} NEW</span>}
-                <button onClick={() => setCollapsedPersist(!collapsed)} aria-label="collapse chat" className="collapse-btn shrink-0">{collapsed ? "[+]" : "[—]"}</button>
-                <button onClick={() => setChatOpen(false)} aria-label="minimize chat" className="text-base font-black px-4 py-2 min-w-[44px] min-h-[44px] shrink-0 leading-none">_</button>
-              </div>
               <div className={`chat-fold${collapsed ? " folded" : ""}`}><div className="chat-fold-inner">
               <div data-modal-scroll className="h-48 overflow-y-auto p-2 space-y-2 text-xs">
                 {chatMsgs.map((m) => (
