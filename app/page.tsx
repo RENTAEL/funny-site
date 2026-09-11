@@ -2087,7 +2087,7 @@ export default function OppositeExe() {
         </div>
       </PortalBox>
       <PortalBox>
-        <div className="fixed top-2 right-2 z-[50] mono-label bg-black text-[var(--text-2)] px-2 py-1 rounded border border-[var(--border-strong)] max-w-[38vw] md:max-w-[45vw] text-right whitespace-nowrap overflow-hidden text-ellipsis">
+        <div className="visitor-counter mono-label bg-black text-[var(--text-2)] px-2 py-1 rounded border border-[var(--border-strong)] max-w-[38vw] md:max-w-[45vw] text-right whitespace-nowrap overflow-hidden text-ellipsis">
           VISITOR #000001 — IT'S JUST YOU. IT'S ALWAYS BEEN JUST YOU.
         </div>
       </PortalBox>

@@ -359,6 +359,15 @@ body {
     transform: translateX(-50%);
   }
 }
+.visitor-counter {
+  position: fixed;
+  z-index: 30;
+  top: calc(72px + env(safe-area-inset-top, 0px));
+  right: 8px;
+}
+@media (min-width: 768px) {
+  .visitor-counter { top: calc(106px + env(safe-area-inset-top, 0px)); }
+}
 .head-flash {
   position: absolute;
   inset: 0;
