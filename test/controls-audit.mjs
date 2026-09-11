@@ -39,12 +39,16 @@ let checked = false;
 try { await p.waitForFunction(() => document.body.innerText.includes("✓"), { timeout: 2500 }); checked = true; } catch (e) {}
 mark("captcha-toggles", checked, "fake captcha checks then unchecks");
 await p.getByRole("button", { name: "Submit" }).scrollIntoViewIfNeeded();
+const sb = await p.getByRole("button", { name: "Submit" }).boundingBox();
 await p.getByRole("button", { name: "Submit" }).hover();
 await sleep(600);
-mark("submit-dodges", await p.evaluate(() => {
-  const b = Array.from(document.querySelectorAll("button")).find((x) => ((x.textContent || "").trim() === "Submit"));
-  return !!b && (b.style.position === "fixed" || (b.getBoundingClientRect().x > 200 && b.getBoundingClientRect().x < 2000));
-}), "runaway button flees hover");
+mark("submit-dodges", await p.evaluate((b) => {
+  const x = Array.from(document.querySelectorAll("button")).find((q) => ((q.textContent || "").trim() === "Submit"));
+  if (!x) return false;
+  const q = x.getBoundingClientRect();
+  const moved = Math.hypot(q.x - b.x, q.y - b.y) > 10;
+  return moved || x.style.position === "fixed" || x.className.includes("fixed");
+}, sb ? { x: sb.x, y: sb.y } : { x: -9999, y: -9999 }), "runaway button flees hover");
 console.log("errors: " + JSON.stringify(errs));
 await browser.close();
 console.log("controls-audit-done " + res.filter(Boolean).length + "/" + res.length);
