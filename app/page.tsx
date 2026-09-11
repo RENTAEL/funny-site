@@ -141,6 +141,17 @@ export default function OppositeExe() {
   const [magnet, setMagnet] = useState(false);
   const [butter, setButter] = useState(false);
   const butterAt = useRef(0);
+  const [adShow, setAdShow] = useState(false);
+  const [adSecs, setAdSecs] = useState(5);
+  const adTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [holdPct, setHoldPct] = useState(0);
+  const holdingRef = useRef(false);
+  const holdTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [battery, setBattery] = useState(false);
+  const batteryRef = useRef(false);
+  const batteryTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [regretOpen, setRegretOpen] = useState(false);
+  const [regretPicked, setRegretPicked] = useState<number[]>([]);
   const [exitOpen, setExitOpen] = useState(false);
   const [legalMsg, setLegalMsg] = useState<string | null>(null);
   const [nlEmail, setNlEmail] = useState("");
@@ -612,6 +623,15 @@ export default function OppositeExe() {
     } else if (cmd === "chat") {
       setChatOpen(true);
       setChatMsgs((prev) => [...prev, { me: false, text: arg, k: kid() }]);
+    } else if (cmd === "ad") {
+      startAd();
+    } else if (cmd === "hold") {
+      setToast("admin is holding your button. it reset at 99%.");
+      setTimeout(() => setToast(null), 4000);
+    } else if (cmd === "battery") {
+      batteryStart();
+    } else if (cmd === "regret") {
+      regretStart();
     }
   };
 
@@ -1223,6 +1243,54 @@ export default function OppositeExe() {
       setTimeout(() => setToast(null), 3000);
     }, 4000);
   };
+  const startAd = () => {
+    if (adTimer.current) clearInterval(adTimer.current);
+    setAdShow(true);
+    setAdSecs(5);
+    adTimer.current = setInterval(() => {
+      setAdSecs((s) => {
+        if (s <= 1) { if (adTimer.current) clearInterval(adTimer.current); return 0; }
+        return s - 1;
+      });
+    }, 1000);
+  };
+  const closeAd = () => {
+    if (adTimer.current) clearInterval(adTimer.current);
+    setAdShow(false);
+    setToast("you just watched an ad for nothing. congratulations.");
+    setTimeout(() => setToast(null), 3000);
+  };
+  const holdStart = () => {
+    if (holdingRef.current) return;
+    holdingRef.current = true;
+    holdTimer.current = setInterval(() => {
+      setHoldPct((p) => {
+        const n = p + 4 + Math.random() * 6;
+        if (n >= 99) {
+          if (holdTimer.current) clearInterval(holdTimer.current);
+          holdingRef.current = false;
+          setToast("99%. so close. skill issue. it reset.");
+          setTimeout(() => setToast(null), 3000);
+          return 0;
+        }
+        return n;
+      });
+    }, 90);
+  };
+  const holdStop = () => {
+    if (holdTimer.current) clearInterval(holdTimer.current);
+    holdingRef.current = false;
+    setHoldPct(0);
+  };
+  const batteryStart = () => {
+    if (batteryTimer.current) clearTimeout(batteryTimer.current);
+    batteryRef.current = true;
+    setBattery(true);
+    setToast("4% remaining. brightness confiscated.");
+    setTimeout(() => setToast(null), 4000);
+    batteryTimer.current = setTimeout(() => { batteryRef.current = false; setBattery(false); }, 25000);
+  };
+  const regretStart = () => { setRegretPicked([]); setRegretOpen(true); };
   const toggleTabPanic = (v: boolean) => { setTabPanic(v); tabPanicRef.current = v; };
   const slowNetStart = () => {
     setSlowNet(true);
@@ -1471,7 +1539,7 @@ export default function OppositeExe() {
   };
   const adminFire = (fn: () => void) => () => { fn(); doJudgment(); };
   const chaosLocal = () => {
-    const pool = ["spin", "invert", "gravity", "drunk", "bsod", "update", "virus", "confetti", "boom", "airhorn", "comic", "crt", "mirror", "cursor", "flood", "flee", "quake", "lights", "tabpanic", "slownet", "popups", "rain", "clippy", "autopilot", "shake", "judgment"];
+    const pool = ["spin", "invert", "gravity", "drunk", "bsod", "update", "virus", "confetti", "boom", "airhorn", "comic", "crt", "mirror", "cursor", "flood", "flee", "quake", "lights", "tabpanic", "slownet", "popups", "rain", "clippy", "autopilot", "shake", "judgment", "ad", "hold", "battery", "regret"];
     const picks = [...pool].sort(() => Math.random() - 0.5).slice(0, 5);
     picks.forEach((g, i) => setTimeout(() => fireLocalGag(g), i * 700));
     doJudgment();
@@ -1507,6 +1575,10 @@ export default function OppositeExe() {
     else if (g === "flee") fleeChaos();
     else if (g === "quake") quakeStart();
     else if (g === "lights") lightsStart();
+    else if (g === "ad") startAd();
+    else if (g === "hold") { setToast("hold the button. 99% is basically 100%."); setTimeout(() => setToast(null), 3000); try { document.getElementById("hold99")?.scrollIntoView({ behavior: "smooth", block: "center" }); } catch { /* shy */ } }
+    else if (g === "battery") batteryStart();
+    else if (g === "regret") regretStart();
   };
 
   const onGag = (g: string) => { fireLocalGag(g); doJudgment(); };
@@ -1529,6 +1601,7 @@ export default function OppositeExe() {
         "min-h-screen transition-all duration-500 overflow-x-hidden",
         isRainbow ? "bg-gradient-to-r from-red-500 via-yellow-500 via-green-500 via-blue-500 to-purple-500 animate-pulse" : "bg-slate-900",
         isInverted ? "invert" : "",
+        battery ? "grayscale brightness-75" : "",
         isComicSans ? "font-['Comic_Sans_MS',_cursive]" : "font-sans",
         (precision || bigCursor) ? "cursor-none" : ""
       )}
@@ -1559,6 +1632,48 @@ export default function OppositeExe() {
             </button>
           </div>
         </PortalBox>
+      )}
+
+      {adShow && (
+        <PortalBox>
+          <div className="fixed inset-0 z-[150] bg-black flex flex-col items-center justify-center p-6 text-center">
+            <p className="text-[10px] uppercase tracking-widest text-slate-500 mb-2">ad. you cannot afford to skip this. literally.</p>
+            <p className="text-3xl font-black text-yellow-400 mb-2">🔥 hot singles in your area want to sell you RAM 🔥</p>
+            <p className="text-sm text-slate-400 italic mb-6">16gb. free. download now. this is definitely how ram works.</p>
+            <div className="bg-red-600 text-white font-black px-6 py-3 rounded-xl">DOWNLOAD MORE RAM</div>
+            <div className="mt-8">
+              {adSecs > 0 ? (
+                <p className="text-slate-500 font-mono">skip in {adSecs}...</p>
+              ) : (
+                <button onClick={closeAd} className="bg-slate-700 px-6 py-2 rounded font-bold text-sm">skip ad ⏭</button>
+              )}
+            </div>
+          </div>
+        </PortalBox>
+      )}
+
+      {battery && (
+        <div className="fixed top-2 left-1/2 -translate-x-1/2 z-[60] pointer-events-none bg-black/80 border border-lime-400 text-lime-400 font-mono text-xs font-bold px-3 py-1 rounded-full">🪫 4% · battery saver on. blame yourself.</div>
+      )}
+
+      {regretOpen && (
+        <Modal comic={comic}>
+          <div className="bg-slate-800 rounded-2xl border-4 border-black p-4">
+            <p className="font-black uppercase text-sm mb-1">prove you are human</p>
+            <p className="text-xs text-slate-400 italic mb-3">select all squares with <b>regret</b>. all of them have it. obviously.</p>
+            <div className="grid grid-cols-3 gap-2 mb-3">
+              {[["🧦", "wet socks"], ["📅", "tuesday"], ["📧", "reply all"], ["✓✓", "read receipts"], ["🕐", "daylight savings"], ["🌡️", "thermostat wars"], ["🖨️", "printer noises"], ["💬", "group chat"], ["📆", "monday"]].map(([moji, r], i) => (
+                <button key={r} onClick={() => setRegretPicked((prev) => prev.includes(i) ? prev.filter((x) => x !== i) : [...prev, i])} className={cn("rounded-xl p-3 text-xs font-bold border-2", regretPicked.includes(i) ? "bg-lime-600 border-lime-300" : "bg-slate-900 border-slate-700")}>
+                  <span className="block text-2xl">{moji}</span>{r}
+                </button>
+              ))}
+            </div>
+            <div className="flex gap-2">
+              <button onClick={() => { setToast("0 out of 9. impressive. the regret was inside you all along."); setTimeout(() => setToast(null), 4000); setRegretPicked([]); }} className="flex-1 bg-blue-600 rounded-xl p-3 text-xs font-black uppercase">verify</button>
+              <button onClick={() => { setRegretOpen(false); setToast("wise. regret always wins."); setTimeout(() => setToast(null), 3000); }} className="flex-1 bg-slate-700 rounded-xl p-3 text-xs font-black uppercase">give up</button>
+            </div>
+          </div>
+        </Modal>
       )}
 
       <PortalBox>
@@ -1776,7 +1891,7 @@ export default function OppositeExe() {
                   )}
                 </div>
               )}
-                <button onClick={() => setChatOpen(false)} className="text-xs font-bold px-2">_</button>
+                <button onClick={() => setChatOpen(false)} aria-label="minimize chat" className="text-base font-black px-4 py-2 min-w-[44px] min-h-[44px] shrink-0 leading-none">_</button>
               </div>
               <div data-modal-scroll className="h-48 overflow-y-auto p-2 space-y-2 text-xs">
                 {chatMsgs.map((m) => (
@@ -2201,6 +2316,15 @@ export default function OppositeExe() {
             </motion.button>
             <p className="mt-12 text-xs text-red-400 italic font-mono">serious warning: pressing this might cause extreme confusion</p>
             {godMode && <p className="mt-4 font-black text-yellow-400 animate-pulse">GOD MODE ENGAGED</p>}
+          </section>
+          <section className="col-span-1 flex flex-col items-center justify-center p-8 bg-slate-800 rounded-3xl border-4 border-black space-y-4">
+            <h2 className="text-xl font-black uppercase italic">almost free money</h2>
+            <p className="text-xs text-slate-400 italic">hold to confirm. definitely works.</p>
+            <div className="w-full bg-slate-900 rounded-full h-6 overflow-hidden border-2 border-black">
+              <div className="h-full bg-lime-400 transition-all" style={{ width: Math.min(100, holdPct) + "%" }} />
+            </div>
+            <p className="font-mono font-bold text-lime-400">{Math.floor(Math.min(99, holdPct))}%</p>
+            <button id="hold99" onPointerDown={holdStart} onPointerUp={holdStop} onPointerLeave={holdStop} onContextMenu={(e) => e.preventDefault()} className="bg-lime-400 text-black px-8 py-4 rounded-xl font-black uppercase select-none touch-none">hold to confirm</button>
           </section>
 
         </div>

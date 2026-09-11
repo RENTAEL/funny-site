@@ -26,7 +26,7 @@ type SharedVis = { presenceState: () => Record<string, Visitor[]> };
 type SpyMsg = { from: string; text: string; at: number; k: string };
 type SupportMsg = { id: string; name: string; text: string; at: number; k: string };
 let inboxK = 1;
-const GAGS = ["spin", "invert", "gravity", "drunk", "bsod", "update", "virus", "confetti", "boom", "airhorn", "comic", "crt", "mirror", "cursor", "flood", "flee", "quake", "lights", "tabpanic", "slownet", "popups", "rain", "clippy", "autopilot", "shake", "judgment", "audience", "magnet", "butter", "exile", "cursor"];
+const GAGS = ["spin", "invert", "gravity", "drunk", "bsod", "update", "virus", "confetti", "boom", "airhorn", "comic", "crt", "mirror", "cursor", "flood", "flee", "quake", "lights", "tabpanic", "slownet", "popups", "rain", "clippy", "autopilot", "shake", "judgment", "audience", "magnet", "butter", "exile", "cursor", "ad", "hold", "battery", "regret"];
 function rel(ts: number, now: number) {
   const s = Math.max(0, Math.floor((now - ts) / 1000));
   if (s < 5) return "just now";

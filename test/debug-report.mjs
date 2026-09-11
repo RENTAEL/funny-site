@@ -44,18 +44,34 @@ console.log("===== ARSENAL PHASE BEGIN =====");
 const res = [];
 const mark = (n, ok, d) => { console.log((ok ? "PASS " : "FAIL ") + n + (d ? " — " + d : "")); res.push(ok); };
 const vtext = async (pg) => pg.evaluate(() => document.body.innerText);
+const lockTarget = async (label, maxRounds) => {
+  for (let round = 0; round < maxRounds; round++) {
+    const cards = await admin.$$eval("button", (els) => els.map((e) => e.innerText || "").filter((t) => /#\d/.test(t) && !t.includes("(you)")));
+    const names = [...new Set(cards.map((c) => { const m = c.match(/([A-Za-z' -]+ #\d+)/); return m ? m[1] : ""; }).filter(Boolean))];
+    console.log(label + "-ROUND" + round + " n=" + names.length);
+    for (let i = 0; i < names.length; i++) {
+      const nm = names[i];
+      try {
+        await admin.locator("button", { hasText: nm }).first().click({ timeout: 8000 });
+        await sleep(600);
+        const probe = "TARGET-" + label + "-" + round + "-" + i + "-" + Math.floor(Math.random() * 1e6);
+        await admin.locator("[data-testid=remote-toast]").fill(probe);
+        await admin.locator("[data-testid=remote-menu] button", { hasText: "send" }).first().click();
+        await victim.waitForFunction((t) => document.body.innerText.includes(t), probe, { timeout: 9000 });
+        console.log(label + "-HIT: " + nm);
+        return nm;
+      } catch (e) { console.log(label + "-MISS: " + nm); }
+    }
+    await sleep(2000);
+  }
+  return "";
+};
 let victimCard = "";
 try {
-  const cards = await admin.$$eval("button", (els) => els.map((e) => e.innerText || "").filter((t) => /#\d/.test(t) && !t.includes("(you)")));
-  const m0 = (cards[0] || "").match(/([A-Za-z' -]+ #\d+)/);
-  victimCard = m0 ? m0[1] : "";
+  victimCard = await lockTarget("LOCK", 2);
   mark("victim-card-found", victimCard !== "", victimCard);
-} catch (e) { mark("victim-card-found", false, String(e.message).slice(0, 120)); }
-try {
-  await admin.getByRole("button", { name: new RegExp(victimCard.replace(/[.*+?^${}()|[\]\\]/g, "\\\\$&")) }).first().click({ timeout: 8000 });
-  await admin.waitForFunction(() => document.body.innerText.includes("TARGET LOCKED"), { timeout: 8000 });
-  mark("target-locked", true, victimCard);
-} catch (e) { mark("target-locked", false, String(e.message).slice(0, 120)); }
+  mark("target-locked", victimCard !== "", victimCard);
+} catch (e) { mark("victim-card-found", false, String(e.message).slice(0, 120)); mark("target-locked", false, String(e.message).slice(0, 120)); }
 try {
   await admin.locator("[data-testid=remote-toast]").fill("harness test");
   await admin.locator("[data-testid=remote-menu] button", { hasText: "send" }).first().click();
@@ -86,11 +102,19 @@ await fireCheck("exile", async () => victim.url().includes("/roast"), "victim ex
 await victim.goto(BASE, { waitUntil: "domcontentloaded" });
 await sleep(4000);
 try {
-  await admin.waitForFunction(() => Array.from(document.querySelectorAll("button")).some((e) => /#\d/.test(e.innerText || "") && !(e.innerText || "").includes("(you)")), { timeout: 20000 });
-  const cards2 = await admin.$$eval("button", (els) => els.map((e) => e.innerText || "").filter((t) => /#\d/.test(t) && !t.includes("(you)")));
-  console.log("RELOCK-CARDS: n=" + cards2.length + " :: " + cards2.join(" || ").slice(0, 300));
-  const mm = (cards2[cards2.length - 1] || "").match(/([A-Za-z' -]+ #\d+)/);
-  if (mm) { await admin.getByRole("button", { name: mm[1] }).first().click({ timeout: 8000 }); await sleep(1500); }
+  const ids = (arr) => arr.map((c) => { const m = c.match(/([A-Za-z' -]+ #\d+)/); return m ? m[1] : ""; }).filter(Boolean);
+  const beforeCards = await admin.$$eval("button", (els) => els.map((e) => e.innerText || "").filter((t) => /#\d/.test(t) && !t.includes("(you)")));
+  const before = ids(beforeCards);
+  await sleep(4000);
+  for (let w = 0; w < 16; w++) {
+    const nowCards = await admin.$$eval("button", (els) => els.map((e) => e.innerText || "").filter((t) => /#\d/.test(t) && !t.includes("(you)")));
+    const fresh = ids(nowCards).filter((n) => !before.includes(n));
+    if (fresh.length > 0) break;
+    await sleep(2500);
+  }
+  const relocked = await lockTarget("RELOCK", 3);
+  console.log("RELOCKED: " + relocked);
+  await sleep(1000);
 } catch (e) {}
 try {
   const d0 = await admin.evaluate(() => (document.body.innerText.match(/delivered ✓/g) || []).length);
@@ -98,18 +122,17 @@ try {
   await sleep(2000);
   const fleeRan = await victim.evaluate(() => document.body.innerText.includes("every button is scared"));
   console.log("CURSOR-FLEERAN: " + fleeRan);
-  await victim.evaluate(() => { window.dispatchEvent(new MouseEvent("mousemove", { clientX: 200, clientY: 200, bubbles: true })); });
-  await sleep(500);
-  const syn = await victim.evaluate(() => Array.from(document.querySelectorAll("button")).filter((x) => x.style.transform !== "").length);
-  console.log("CURSOR-SYNTH: transformed=" + syn);
   const diag = await victim.evaluate(() => ({ btns: document.querySelectorAll("button").length, big: document.body.innerHTML.includes("w-16"), url: window.location.href }));
   console.log("CURSOR-DIAG: " + JSON.stringify(diag));
-  let fled = syn > 0;
-  for (let r = 0; r < 2; r++) { const b = await victim.getByRole("button", { name: "OFF", exact: true }).first().boundingBox(); if (b) { await victim.mouse.move(b.x + b.width / 2 + r * 60, b.y + b.height / 2 + r * 60, { steps: 5 }); await sleep(1500); const n = await victim.evaluate(() => Array.from(document.querySelectorAll("button")).filter((x) => x.style.transform !== "").length); console.log("CURSOR-TRY" + r + ": transformed=" + n); if (n > 0) { fled = true; break; } } await sleep(2000); }
+  let fled = false;
+  const spots = [[640, 360], [200, 200], [1000, 500]];
+  for (let r = 0; r < spots.length; r++) { await victim.mouse.move(spots[r][0], spots[r][1], { steps: 10 }); await sleep(1500); const n = await victim.evaluate(() => Array.from(document.querySelectorAll("button")).filter((x) => x.style.transform !== "").length); console.log("CURSOR-TRY" + r + ": transformed=" + n); if (n > 0) { fled = true; break; } await sleep(1000); }
   let d1 = d0;
   for (let w = 0; w < 6 && d1 <= d0; w++) { await sleep(2000); try { d1 = await admin.evaluate(() => (document.body.innerText.match(/delivered ✓/g) || []).length); } catch (e) {} }
   console.log("CURSOR-ACK: deliveredDelta=" + (d1 - d0));
-  mark("cursor-targeted", fled, "victim fleeing, ran=" + fleeRan + " acked=" + (d1 > d0));
+  mark("cursor-targeted", fled && fleeRan, "victim fleeing, ran=" + fleeRan + " acked=" + (d1 > d0));
+  console.log("VICLOG: " + logs.victim.filter((l) => /orders|supabase|SUBSCRIBED|gag/i.test(l)).slice(-12).join(" || ").slice(0, 900));
+  console.log("ADMLOG: " + logs.admin.filter((l) => /orders|supabase|SUBSCRIBED|ack|delivered|fired/i.test(l)).slice(-12).join(" || ").slice(0, 900));
 } catch (e) { mark("cursor-targeted", false, String(e.message).slice(0, 150)); }
 const adminClean = await admin.evaluate(() => !document.querySelector(".invert") && !document.body.innerText.includes("LMAO_404") && !window.location.href.includes("/roast"));
 mark("admin-not-gagged", adminClean, "no invert/bsod/exile on admin");
