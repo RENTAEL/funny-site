@@ -1,0 +1,12 @@
+# vercel upload ignore (takes precedence over .gitignore, so essentials are mirrored here)
+node_modules/
+.next/
+out/
+.env*.local
+.vercel
+*.log
+.DS_Store
+# local tooling: graphify junction + harness logs must never deploy
+.codegraph/
+harness*.txt
+test/screenshots/
