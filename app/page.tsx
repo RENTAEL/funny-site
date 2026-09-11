@@ -1870,7 +1870,7 @@ export default function OppositeExe() {
       </PortalBox>
 
       <PortalBox>
-        {!audience && (<div className="fixed bottom-4 right-4 z-[50] w-64 md:w-72 max-w-[70vw]">
+        {!audience && (<div className={`fixed bottom-4 right-4 ${adminOpen ? "z-[210]" : "z-[50]"} w-64 md:w-72 max-w-[70vw] touch-manipulation`}>
           {!chatOpen ? (
             <button
               onClick={() => setChatOpen(true)}
@@ -1880,10 +1880,10 @@ export default function OppositeExe() {
             </button>
           ) : (
             <div className={`bg-slate-800 rounded-2xl border-4 border-black shadow-xl overflow-hidden ${comic}`}>
-              <div className="bg-green-700 px-3 py-2 flex justify-between items-center">
-                <span className="text-xs font-black uppercase">victims' chat • {roomCount} here</span>
+              <div className="bg-green-700 px-2 py-2 flex justify-between items-center gap-2">
+                <span className="text-xs font-black uppercase truncate min-w-0">victims' chat<span className="hidden min-[420px]:inline"> • {roomCount} here</span></span>
               {displayName !== "" && (
-                <div className="px-2 py-1 flex gap-1 items-center bg-slate-900 text-xs">
+                <div className="px-2 py-1 flex gap-1 items-center bg-slate-900 text-xs min-w-0">
                   {isCustom ? (
                     <><span className="truncate">you are <b>{displayName}</b></span><button onClick={resetName} className="underline shrink-0">reset</button></>
                   ) : (
