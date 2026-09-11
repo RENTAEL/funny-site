@@ -15,6 +15,7 @@ import Testimonials from "../components/Testimonials";
 import Reveal from "../components/Reveal";
 import AdminPanel from "../components/AdminPanel";
 import { setSharedChannel } from "@/utils/supabase/channels";
+import { AMBIENT_BANK, MELTDOWN_BANK, GAG_REACT, BSOD_REACT, NAME_REACT, CAMEO_TAKES, CANNED_BANK, SHUTDOWN_LINE, TIMEOUT_APOLOGY, RECOVER_LINE, oppieGreet, pick, shuffle, cap } from "@/lib/oppie";
 // twMerge-import-replaced from 'tailwind-merge';
 
 function cn(...inputs: ClassValue[]) {
@@ -223,10 +224,30 @@ export default function OppositeExe() {
   const lastSupaRef = useRef(0);
   const supaChatRef = useRef<((text: string) => void) | null>(null);
   const lastSentRef = useRef(0);
-  const roomSendRef = useRef<((text: string) => void) | null>(null);
+  const roomSendRef = useRef<((text: string, name?: string) => void) | null>(null);
   const vidRef = useRef("");
   const [roomCount, setRoomCount] = useState(0);
   const [displayName, setDisplayName] = useState("");
+  const [oppieOpen, setOppieOpen] = useState(false);
+  const [oppieMsgs, setOppieMsgs] = useState<Array<{ k: string; who: string; text: string }>>([]);
+  const [oppieInput, setOppieInput] = useState("");
+  const [oppieTyping, setOppieTyping] = useState(false);
+  const [oppieUnread, setOppieUnread] = useState(0);
+  const [meltdown, setMeltdown] = useState(false);
+  const oppieOpenRef = useRef(false);
+  const oppieBooted = useRef(false);
+  const oppieCount = useRef(0);
+  const oppieShut = useRef(false);
+  const oppieLastSend = useRef(0);
+  const ambientBag = useRef<string[]>([]);
+  const ambientTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const meltdownUntil = useRef(0);
+  const meltdownRef = useRef(false);
+  const cameoDone = useRef(false);
+  const fallbackNoticed = useRef(false);
+  const seenChaos = useRef<string[]>([]);
+  const oppieStatsRef = useRef({ served: 0, meltdowns: 0, fallbacks: 0 });
+  const oppieLogRef = useRef<HTMLDivElement | null>(null);
   const [isCustom, setIsCustom] = useState(false);
   const [nameInput, setNameInput] = useState("");
   const customRef = useRef(false);
@@ -598,7 +619,93 @@ export default function OppositeExe() {
     };
   }, []);
 
+  const oppieSay = (text: string) => {
+    const t = cap(text, 300);
+    if (!t) return;
+    setOppieMsgs((prev) => [...prev.slice(-29), { k: "o" + Date.now().toString(36) + Math.floor(Math.random() * 1e6).toString(36), who: "oppie", text: t }]);
+    oppieStatsRef.current.served++;
+    if (!oppieOpenRef.current) setOppieUnread((n) => n + 1);
+  };
+  const oppieGagNudge = (cmd: string) => {
+    setTimeout(() => {
+      const line = cmd === "bsod" ? pick(BSOD_REACT) : pick(GAG_REACT);
+      oppieSay(meltdownUntil.current > Date.now() ? line.toUpperCase() : line);
+    }, 2000 + Math.random() * 3000);
+  };
+  const openOppie = () => {
+    setOppieOpen(true);
+    oppieOpenRef.current = true;
+    setOppieUnread(0);
+    try { localStorage.setItem("opp_oppie_collapsed", "0"); } catch { /* open */
+    }
+    if (!oppieBooted.current) {
+      oppieBooted.current = true;
+      let nm = "";
+      try { nm = localStorage.getItem("opp_name") || ""; } catch { /* nameless */
+      }
+      oppieSay(oppieGreet(nm));
+    }
+  };
+  const closeOppie = () => {
+    setOppieOpen(false);
+    oppieOpenRef.current = false;
+    try { localStorage.setItem("opp_oppie_collapsed", "1"); } catch { /* shut */
+    }
+  };
+  const sendOppie = async () => {
+    const text = oppieInput.trim().slice(0, 500);
+    if (!text || oppieTyping) return;
+    if (oppieShut.current) return;
+    if (oppieCount.current >= 30) {
+      oppieShut.current = true;
+      oppieSay(SHUTDOWN_LINE);
+      return;
+    }
+    const now = Date.now();
+    if (now - oppieLastSend.current < 3000) return;
+    oppieLastSend.current = now;
+    oppieCount.current++;
+    setOppieMsgs((prev) => [...prev.slice(-29), { k: "o" + now.toString(36) + Math.floor(Math.random() * 1e6).toString(36), who: "you", text }]);
+    setOppieInput("");
+    setOppieTyping(true);
+    const hist = oppieMsgs.slice(-6).map((m) => ({ who: m.who, text: m.text.slice(0, 300) }));
+    const nm = displayName || codeNameRef.current;
+    try {
+      const ctl = new AbortController();
+      const to = setTimeout(() => ctl.abort(), 10000);
+      const r = await fetch("/api/oppie", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ message: text, name: nm, history: hist }), signal: ctl.signal });
+      clearTimeout(to);
+      const d = await r.json() as { reply?: string; fallback?: boolean };
+      const rep = String(d.reply || "").trim();
+      oppieSay(rep || pick(CANNED_BANK));
+      if (d.fallback && !fallbackNoticed.current) {
+        fallbackNoticed.current = true;
+        oppieStatsRef.current.fallbacks++;
+        try { supaChatRef.current?.("OPPIE fell back to canned brain (provider down)"); } catch { /* quiet */
+        }
+      }
+    } catch {
+      oppieSay(TIMEOUT_APOLOGY);
+    } finally {
+      setOppieTyping(false);
+    }
+  };
+  const enterMeltdown = () => {
+    meltdownUntil.current = Date.now() + 60000;
+    const w = window as unknown as { __oppieMeltdowns?: number };
+    w.__oppieMeltdowns = (w.__oppieMeltdowns || 0) + 1;
+    oppieStatsRef.current.meltdowns++;
+    if (!meltdownRef.current) { meltdownRef.current = true; setMeltdown(true); }
+    setTimeout(() => {
+      if (Date.now() >= meltdownUntil.current && meltdownRef.current) {
+        meltdownRef.current = false;
+        setMeltdown(false);
+        oppieSay(RECOVER_LINE);
+      }
+    }, 61000);
+  };
   const runRemoteGag = (cmd: string, arg: string) => {
+    oppieGagNudge(cmd);
     if (cmd === "confetti") {
       confetti({ particleCount: 150, spread: 100, origin: { y: 0.6 } });
     } else if (cmd === "boom") {
@@ -853,6 +960,18 @@ export default function OppositeExe() {
         .subscribe();
       const support = sb.channel("support", { config: { private: false } });
       support.subscribe();
+      const chaos = sb.channel("chaos", { config: { private: false } });
+      chaos
+        .on("broadcast", { event: "meltdown" }, (m: { payload: { id: string; gag: string; ts: number } }) => {
+          const d = m.payload;
+          if (!d || !d.id) return;
+          if (seenChaos.current.indexOf(d.id) >= 0) return;
+          seenChaos.current.push(d.id);
+          if (seenChaos.current.length > 200) seenChaos.current.splice(0, seenChaos.current.length - 200);
+          if (adminOpenRef.current) return;
+          if (d.gag === "oppie-meltdown") enterMeltdown();
+        })
+        .subscribe();
       const room = sb.channel("room", { config: { private: false } });
       room
         .on("broadcast", { event: "msg" }, (m: { payload: RoomMsg }) => {
@@ -862,9 +981,9 @@ export default function OppositeExe() {
           if (collapsedRef.current) setUnread((n) => n + 1);
         })
         .subscribe();
-      roomSendRef.current = (text: string) => {
+      roomSendRef.current = (text: string, name?: string) => {
         try {
-          room.send({ type: "broadcast", event: "msg", payload: { id: vidRef.current, name: codeNameRef.current, text: text.slice(0, 200), at: Date.now() } });
+          room.send({ type: "broadcast", event: "msg", payload: { id: vidRef.current, name: name || codeNameRef.current, text: text.slice(0, 200), at: Date.now() } });
         } catch { /* void eats it */ }
       };
       supaChatRef.current = (text: string) => {
@@ -884,6 +1003,51 @@ export default function OppositeExe() {
   }, []);
 
   useEffect(() => { adminOpenRef.current = adminOpen; }, [adminOpen]);
+  useEffect(() => {
+    const el = oppieLogRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [oppieMsgs, oppieTyping]);
+  useEffect(() => {
+    let dead = false;
+    const bag: string[] = [];
+    const tick = () => {
+      if (dead) return;
+      const w = window as unknown as { __oppieAmbientMs?: number };
+      const inMeltdown = meltdownUntil.current > Date.now();
+      let line: string;
+      if (inMeltdown) {
+        line = pick(MELTDOWN_BANK).toUpperCase();
+      } else {
+        if (bag.length === 0) bag.push(...shuffle(AMBIENT_BANK));
+        line = bag.pop() as string;
+      }
+      oppieSay(line);
+      ambientTimer.current = setTimeout(tick, inMeltdown ? 8000 : (w.__oppieAmbientMs ?? (45000 + Math.random() * 45000)));
+    };
+    const w0 = window as unknown as { __oppieAmbientMs?: number };
+    ambientTimer.current = setTimeout(tick, w0.__oppieAmbientMs ?? (45000 + Math.random() * 45000));
+    return () => { dead = true; if (ambientTimer.current) clearTimeout(ambientTimer.current); };
+  }, []);
+  useEffect(() => {
+    const t = setTimeout(() => {
+      if (cameoDone.current) return;
+      cameoDone.current = true;
+      const text = pick(CAMEO_TAKES);
+      setOppieMsgs((prev) => [...prev.slice(-29), { k: "c" + Date.now().toString(36), who: "oppie", text }]);
+      oppieStatsRef.current.served++;
+      try { roomSendRef.current?.(text, "OPPIE"); } catch { /* solo show */
+      }
+    }, 60000);
+    return () => clearTimeout(t);
+  }, []);
+  useEffect(() => {
+    try {
+      if (localStorage.getItem("opp_oppie_collapsed") === "0") openOppie();
+    } catch { /* shut */
+    }
+    const w = window as unknown as { __oppieStats?: { served: number; meltdowns: number; fallbacks: number } };
+    w.__oppieStats = oppieStatsRef.current;
+  }, []);
   const anyOverlay = termsOpen || bsod || updateOpen || !booted || banners.length > 0;
   useEffect(() => {
     if (!anyOverlay) return;
@@ -1506,6 +1670,7 @@ export default function OppositeExe() {
     codeNameRef.current = clean;
     try { localStorage.setItem("opp_name", clean); } catch { /* forgetful */ }
     if (retrackRef.current) retrackRef.current();
+    setTimeout(() => { oppieSay(NAME_REACT); }, 1500);
   };
   const resetName = () => {
     try { localStorage.removeItem("opp_name"); } catch { /* already forgot */ }
@@ -1885,6 +2050,32 @@ export default function OppositeExe() {
             )}
           </AnimatePresence>
         </div>
+      </PortalBox>
+
+      <PortalBox>
+        {!oppieOpen ? (
+          <button onClick={openOppie} aria-label="open oppie" className="oppie-pill">
+            <span className="oppie-dot" />OPPIE // RESIDENT AI{oppieUnread > 0 && <span className="oppie-unread">{oppieUnread} NEW</span>}
+          </button>
+        ) : (
+          <div className={`oppie-window${meltdown ? " meltdown" : ""}`}>
+            <div className="chat-bar">
+              <span className="chat-dot" /><span className="chat-dot" /><span className="chat-dot" />
+              <span className="chat-title">OPPIE v0.9-beta</span>
+              <button onClick={closeOppie} aria-label="collapse oppie" className="collapse-btn shrink-0">[-]</button>
+            </div>
+            <div className="oppie-log" ref={oppieLogRef}>
+              {oppieMsgs.map((m) => (
+                <div key={m.k} className={`oppie-msg${m.who === "you" ? " me" : ""}`}>{m.who === "you" ? null : <span className="oppie-who">OPPIE: </span>}{m.text}</div>
+              ))}
+              {oppieTyping && <div className="oppie-typing">OPPIE is judging you…</div>}
+            </div>
+            <div className="oppie-inputrow">
+              <input value={oppieInput} onChange={(e) => setOppieInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") sendOppie(); }} placeholder="ask oppie anything. wrong answers free." maxLength={500} aria-label="ask oppie" className="chat-input flex-1 min-w-0" />
+              <button onClick={sendOppie} className="btn-send">send</button>
+            </div>
+          </div>
+        )}
       </PortalBox>
 
       <PortalBox>
