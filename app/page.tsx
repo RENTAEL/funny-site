@@ -16,6 +16,7 @@ import Reveal from "../components/Reveal";
 import AdminPanel from "../components/AdminPanel";
 import { setSharedChannel } from "@/utils/supabase/channels";
 import { AMBIENT_BANK, MELTDOWN_BANK, GAG_REACT, BSOD_REACT, NAME_REACT, CAMEO_TAKES, CANNED_BANK, SHUTDOWN_LINE, TIMEOUT_APOLOGY, RECOVER_LINE, oppieGreet, pick, shuffle, cap } from "@/lib/oppie";
+import { useAutoScroll } from "@/lib/useAutoScroll";
 // twMerge-import-replaced from 'tailwind-merge';
 
 function cn(...inputs: ClassValue[]) {
@@ -117,6 +118,7 @@ export default function OppositeExe() {
     try { localStorage.setItem("opp_chat_collapsed", v ? "1" : "0"); } catch { /* no pocket */ }
   };
   const [chatMsgs, setChatMsgs] = useState<ChatMsg[]>([{ me: false, text: "hi welcome to group therapy. no refunds. what's broken (besides everything)?", k: "k0" }]);
+  const chatScroll = useAutoScroll(chatMsgs.length);
   const [chatInput, setChatInput] = useState('');
   const [chatDead, setChatDead] = useState(false);
   const [honestMsg, setHonestMsg] = useState('');
@@ -234,6 +236,7 @@ export default function OppositeExe() {
   const [displayName, setDisplayName] = useState("");
   const [oppieOpen, setOppieOpen] = useState(false);
   const [oppieMsgs, setOppieMsgs] = useState<Array<{ k: string; who: string; text: string }>>([]);
+  const oppieScroll = useAutoScroll(oppieMsgs.length);
   const [oppieInput, setOppieInput] = useState("");
   const [oppieTyping, setOppieTyping] = useState(false);
   const [oppieUnread, setOppieUnread] = useState(0);
@@ -257,7 +260,6 @@ export default function OppositeExe() {
   const [adBreakSecs, setAdBreakSecs] = useState(5);
   const [toastEscape, setToastEscape] = useState(false);
   const departBusy = useRef(false);
-  const oppieLogRef = useRef<HTMLDivElement | null>(null);
   const [isCustom, setIsCustom] = useState(false);
   const [nameInput, setNameInput] = useState("");
   const customRef = useRef(false);
@@ -679,6 +681,7 @@ export default function OppositeExe() {
     setOppieMsgs((prev) => [...prev.slice(-29), { k: "o" + now.toString(36) + Math.floor(Math.random() * 1e6).toString(36), who: "you", text }]);
     setOppieInput("");
     setOppieTyping(true);
+    oppieScroll.markSent();
     const hist = oppieMsgs.slice(-6).map((m) => ({ who: m.who, text: m.text.slice(0, 300) }));
     const nm = displayName || codeNameRef.current;
     try {
@@ -1065,10 +1068,8 @@ export default function OppositeExe() {
     const t = setTimeout(() => setAdBreakSecs((s) => s - 1), 1000);
     return () => clearTimeout(t);
   }, [adBreak, adBreakSecs]);
-  useEffect(() => {
-    const el = oppieLogRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
-  }, [oppieMsgs, oppieTyping]);
+  useEffect(() => { if (chatOpen && !collapsed) chatScroll.open(); }, [chatOpen, collapsed]);
+  useEffect(() => { if (oppieOpen) oppieScroll.open(); }, [oppieOpen]);
   useEffect(() => {
     let dead = false;
     const bag: string[] = [];
@@ -1320,6 +1321,7 @@ export default function OppositeExe() {
       return;
     }
     lastSentRef.current = now;
+    chatScroll.markSent();
     msgsSentRef.current++;
     const msg = { me: true, text, k: kid(), name: codeNameRef.current, at: now };
     setChatMsgs((prev) => [...prev.slice(-29), msg]);
@@ -2080,13 +2082,13 @@ export default function OppositeExe() {
       )}
 
       <PortalBox>
-        <div className="fixed top-2 left-2 z-[50] font-mono text-xs bg-black/70 text-[var(--accent)] px-2 py-1 rounded">
+        <div className="time-wasted">
           time wasted: {clock}
         </div>
       </PortalBox>
       <PortalBox>
-        <div className="fixed top-2 right-2 z-[50] font-mono text-[10px] bg-black text-[var(--text-2)] px-2 py-1 rounded border border-[var(--border-strong)] max-w-[38vw] md:max-w-[45vw] md:text-xs text-right">
-          visitor #000001 — it&apos;s just you. it&apos;s always been just you.
+        <div className="fixed top-2 right-2 z-[50] mono-label bg-black text-[var(--text-2)] px-2 py-1 rounded border border-[var(--border-strong)] max-w-[38vw] md:max-w-[45vw] text-right whitespace-nowrap overflow-hidden text-ellipsis">
+          VISITOR #000001 — IT'S JUST YOU. IT'S ALWAYS BEEN JUST YOU.
         </div>
       </PortalBox>
 
@@ -2138,11 +2140,14 @@ export default function OppositeExe() {
               <span className="chat-title">OPPIE v0.9-beta</span>
               <button onClick={closeOppie} aria-label="collapse oppie" className="collapse-btn shrink-0">[-]</button>
             </div>
-            <div className="oppie-log" ref={oppieLogRef}>
+            <div className="oppie-logwrap">
+            <div className="oppie-log" ref={oppieScroll.boxRef} onScroll={oppieScroll.onScroll}>
               {oppieMsgs.map((m) => (
                 <div key={m.k} className={`oppie-msg${m.who === "you" ? " me" : ""}`}>{m.who === "you" ? null : <span className="oppie-who">OPPIE: </span>}{m.text}</div>
               ))}
               {oppieTyping && <div className="oppie-typing">OPPIE is judging you…</div>}
+            </div>
+            {oppieScroll.jump > 0 && <button onClick={() => oppieScroll.open()} data-testid="jump-pill" className="jump-pill">↓ {oppieScroll.jump} NEW</button>}
             </div>
             <div className="oppie-inputrow">
               <input value={oppieInput} onChange={(e) => setOppieInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") sendOppie(); }} placeholder="ask oppie anything. wrong answers free." maxLength={500} aria-label="ask oppie" className="chat-input flex-1 min-w-0" />
@@ -2202,7 +2207,8 @@ export default function OppositeExe() {
                 </div>
               )}
               <div className={`chat-fold${collapsed ? " folded" : ""}`}><div className="chat-fold-inner">
-              <div data-modal-scroll className="h-48 overflow-y-auto p-2 space-y-2 text-xs">
+              <div className="chat-msgs-wrap">
+              <div data-modal-scroll ref={chatScroll.boxRef} onScroll={chatScroll.onScroll} className="h-48 overflow-y-auto p-2 space-y-2 text-xs">
                 {chatMsgs.map((m) => (
                   <motion.div key={m.k} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className={cn("p-2 rounded-lg max-w-[90%]", m.me ? "chat-bubble-me" : "chat-bubble-them")}>
                     {!m.me && m.name !== "" && <p className={cn("chat-name", (m.name === displayName || !/ #\d$/.test(m.name || "")) ? "chat-name-pop" : "chat-name-dim")}>{m.name}</p>}
@@ -2210,6 +2216,8 @@ export default function OppositeExe() {
                     {m.at ? <p className="text-[10px] opacity-60 text-right text-[var(--text-3)]">{new Date(m.at).toLocaleTimeString()}</p> : null}
                   </motion.div>
                 ))}
+              </div>
+              {chatScroll.jump > 0 && <button onClick={() => chatScroll.open()} data-testid="jump-pill" className="jump-pill">↓ {chatScroll.jump} NEW</button>}
               </div>
               <div className="p-2 flex gap-1">
                 <input
