@@ -12,5 +12,6 @@ out/
 .DS_Store
 .vercel
 # local tooling (junctions + harness logs must never deploy)
+.codegraph
 .codegraph/
 harness*.txt

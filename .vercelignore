@@ -6,7 +6,9 @@ out/
 .vercel
 *.log
 .DS_Store
-# local tooling: graphify junction + harness logs must never deploy
+# local tooling: graphify junction/symlink + harness logs must never deploy
+# (bare name catches the link itself; slashed form catches dir contents)
+.codegraph
 .codegraph/
 harness*.txt
 test/screenshots/
