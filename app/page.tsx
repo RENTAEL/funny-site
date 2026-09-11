@@ -97,6 +97,23 @@ export default function OppositeExe() {
   const [pwMsg, setPwMsg] = useState('');
   const [bsod, setBsod] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
+  const [unread, setUnread] = useState(0);
+  const collapsedRef = useRef(false);
+  useEffect(() => {
+    try {
+      if (localStorage.getItem("opp_chat_collapsed") === "1") {
+        setCollapsed(true);
+        collapsedRef.current = true;
+      }
+    } catch { /* private mode: chat stays open */ }
+  }, []);
+  const setCollapsedPersist = (v: boolean) => {
+    setCollapsed(v);
+    collapsedRef.current = v;
+    if (!v) setUnread(0);
+    try { localStorage.setItem("opp_chat_collapsed", v ? "1" : "0"); } catch { /* no pocket */ }
+  };
   const [chatMsgs, setChatMsgs] = useState<ChatMsg[]>([{ me: false, text: "hi welcome to group therapy. no refunds. what's broken (besides everything)?", k: "k0" }]);
   const [chatInput, setChatInput] = useState('');
   const [chatDead, setChatDead] = useState(false);
@@ -842,6 +859,7 @@ export default function OppositeExe() {
           const d = m.payload;
           if (!d || !d.text || d.id === vidRef.current) return;
           setChatMsgs((prev) => [...prev.slice(-29), { me: false, text: String(d.text).slice(0, 200), k: "r" + d.at + String(d.id).slice(-4), name: String(d.name || "mystery guest"), at: d.at }]);
+          if (collapsedRef.current) setUnread((n) => n + 1);
         })
         .subscribe();
       roomSendRef.current = (text: string) => {
@@ -1599,7 +1617,7 @@ export default function OppositeExe() {
     <div
       className={cn(
         "min-h-screen transition-all duration-500 overflow-x-hidden",
-        isRainbow ? "bg-gradient-to-r from-red-500 via-yellow-500 via-green-500 via-blue-500 to-purple-500 animate-pulse" : "bg-slate-900",
+        isRainbow ? "bg-gradient-to-r from-red-500 via-yellow-500 via-green-500 via-blue-500 to-purple-500 animate-pulse" : "bg-[var(--bg-1)]",
         isInverted ? "invert" : "",
         battery ? "grayscale brightness-75" : "",
         isComicSans ? "font-['Comic_Sans_MS',_cursive]" : "font-sans",
@@ -1611,15 +1629,15 @@ export default function OppositeExe() {
         transition: "transform 1s ease-in-out"
       }}
     >
-      <div className="fixed inset-0 z-0 pointer-events-none" style={{ background: "radial-gradient(ellipse at 20% 0%, rgba(139,92,246,0.12), transparent 60%), radial-gradient(ellipse at 85% 100%, rgba(34,211,238,0.10), transparent 60%)" }} />
+      <div className="fixed inset-0 z-0 pointer-events-none" style={{ background: "radial-gradient(ellipse at 20% 0%, rgba(163,230,53,0.07), transparent 60%), radial-gradient(ellipse at 85% 100%, rgba(251,191,36,0.06), transparent 60%)" }} />
       {matrix && <canvas ref={matrixRef} className="fixed inset-0 z-0 pointer-events-none opacity-70" />}
 
       {!booted && (
         <PortalBox>
-          <div className="fixed inset-0 z-[150] bg-black text-green-400 font-mono p-6 text-sm">
+          <div className="fixed inset-0 z-[150] bg-black text-[var(--accent)] font-mono p-6 text-sm">
             <div className="max-w-md mx-auto mt-20 space-y-2 min-h-[10rem]">
               {BOOT_LINES.slice(0, bootLines).map((l) => <p key={l}>&gt; {l}</p>)}
-              <span className="inline-block w-2 h-4 bg-green-400 animate-pulse" />
+              <span className="inline-block w-2 h-4 bg-[var(--accent)] animate-pulse" />
             </div>
             <button
               onMouseEnter={dodgeSkip}
@@ -1638,14 +1656,14 @@ export default function OppositeExe() {
         <PortalBox>
           <div className="fixed inset-0 z-[150] bg-black flex flex-col items-center justify-center p-6 text-center">
             <p className="text-[10px] uppercase tracking-widest text-slate-500 mb-2">ad. you cannot afford to skip this. literally.</p>
-            <p className="text-3xl font-black text-yellow-400 mb-2">🔥 hot singles in your area want to sell you RAM 🔥</p>
-            <p className="text-sm text-slate-400 italic mb-6">16gb. free. download now. this is definitely how ram works.</p>
-            <div className="bg-red-600 text-white font-black px-6 py-3 rounded-xl">DOWNLOAD MORE RAM</div>
+            <p className="text-3xl font-bold text-[var(--text-1)] mb-2">🔥 hot singles in your area want to sell you RAM 🔥</p>
+            <p className="text-sm text-[var(--text-2)] italic mb-6">16gb. free. download now. this is definitely how ram works.</p>
+            <div className="bg-[var(--danger)] text-[#0A0A0B] font-bold px-6 py-3 rounded-[6px]">DOWNLOAD MORE RAM</div>
             <div className="mt-8">
               {adSecs > 0 ? (
                 <p className="text-slate-500 font-mono">skip in {adSecs}...</p>
               ) : (
-                <button onClick={closeAd} className="bg-slate-700 px-6 py-2 rounded font-bold text-sm">skip ad ⏭</button>
+                <button onClick={closeAd} className="bg-[var(--bg-2)] border border-[var(--border-strong)] px-6 py-2 rounded-[6px] font-bold text-sm">skip ad ⏭</button>
               )}
             </div>
           </div>
@@ -1653,24 +1671,24 @@ export default function OppositeExe() {
       )}
 
       {battery && (
-        <div className="fixed top-2 left-1/2 -translate-x-1/2 z-[60] pointer-events-none bg-black/80 border border-lime-400 text-lime-400 font-mono text-xs font-bold px-3 py-1 rounded-full">🪫 4% · battery saver on. blame yourself.</div>
+        <div className="fixed top-2 left-1/2 -translate-x-1/2 z-[60] pointer-events-none bg-black/80 border border-[var(--border-strong)] text-[var(--accent)] font-mono text-xs font-bold px-3 py-1 rounded-full">🪫 4% · battery saver on. blame yourself.</div>
       )}
 
       {regretOpen && (
         <Modal comic={comic}>
-          <div className="bg-slate-800 rounded-2xl border-4 border-black p-4">
+          <div className="bg-[var(--bg-1)] rounded-[10px] border border-[var(--border-strong)] p-4">
             <p className="font-black uppercase text-sm mb-1">prove you are human</p>
-            <p className="text-xs text-slate-400 italic mb-3">select all squares with <b>regret</b>. all of them have it. obviously.</p>
+            <p className="text-xs text-[var(--text-2)] italic mb-3">select all squares with <b>regret</b>. all of them have it. obviously.</p>
             <div className="grid grid-cols-3 gap-2 mb-3">
               {[["🧦", "wet socks"], ["📅", "tuesday"], ["📧", "reply all"], ["✓✓", "read receipts"], ["🕐", "daylight savings"], ["🌡️", "thermostat wars"], ["🖨️", "printer noises"], ["💬", "group chat"], ["📆", "monday"]].map(([moji, r], i) => (
-                <button key={r} onClick={() => setRegretPicked((prev) => prev.includes(i) ? prev.filter((x) => x !== i) : [...prev, i])} className={cn("rounded-xl p-3 text-xs font-bold border-2", regretPicked.includes(i) ? "bg-lime-600 border-lime-300" : "bg-slate-900 border-slate-700")}>
+                <button key={r} onClick={() => setRegretPicked((prev) => prev.includes(i) ? prev.filter((x) => x !== i) : [...prev, i])} className={cn("rounded-[6px] p-3 text-xs font-bold border-2", regretPicked.includes(i) ? "bg-[var(--accent)] text-black border-transparent" : "bg-[var(--bg-1)] border-[var(--border-subtle)]")}>
                   <span className="block text-2xl">{moji}</span>{r}
                 </button>
               ))}
             </div>
             <div className="flex gap-2">
-              <button onClick={() => { setToast("0 out of 9. impressive. the regret was inside you all along."); setTimeout(() => setToast(null), 4000); setRegretPicked([]); }} className="flex-1 bg-blue-600 rounded-xl p-3 text-xs font-black uppercase">verify</button>
-              <button onClick={() => { setRegretOpen(false); setToast("wise. regret always wins."); setTimeout(() => setToast(null), 3000); }} className="flex-1 bg-slate-700 rounded-xl p-3 text-xs font-black uppercase">give up</button>
+              <button onClick={() => { setToast("0 out of 9. impressive. the regret was inside you all along."); setTimeout(() => setToast(null), 4000); setRegretPicked([]); }} className="flex-1 bg-[var(--bg-2)] border border-[var(--border-strong)] rounded-[6px] p-3 text-xs font-bold uppercase text-[var(--text-1)]">verify</button>
+              <button onClick={() => { setRegretOpen(false); setToast("wise. regret always wins."); setTimeout(() => setToast(null), 3000); }} className="flex-1 bg-[var(--bg-2)] border border-[var(--border-strong)] rounded-[6px] p-3 text-xs font-bold uppercase text-[var(--text-1)]">give up</button>
             </div>
           </div>
         </Modal>
@@ -1689,7 +1707,7 @@ export default function OppositeExe() {
       {(precision || bigCursor) && (
         <PortalBox>
           <div className="fixed z-[49] pointer-events-none" style={{ left: fakeCursor.x - 12, top: fakeCursor.y - 12 }}>
-            {bigCursor ? (<div className="w-16 h-16 rounded-full border-4 border-lime-400 flex items-center justify-center text-4xl">{"\u{1F449}"}</div>) : (<><div className="w-6 h-6 rounded-full border-2 border-lime-400" /><div className="w-1 h-1 bg-lime-400 rounded-full mx-auto mt-1" /></>)}
+            {bigCursor ? (<div className="w-16 h-16 rounded-full border-4 border-[var(--accent)] flex items-center justify-center text-4xl">{"\u{1F449}"}</div>) : (<><div className="w-6 h-6 rounded-full border-2 border-[var(--accent)]" /><div className="w-1 h-1 bg-[var(--accent)] rounded-full mx-auto mt-1" /></>)}
           </div>
         </PortalBox>
       )}
@@ -1714,7 +1732,7 @@ export default function OppositeExe() {
       {slowNet && (
         <PortalBox>
           <div className="fixed inset-0 z-[150] bg-black/85 flex flex-col items-center justify-center">
-            <div className="w-12 h-12 border-4 border-slate-700 border-t-cyan-400 rounded-full animate-spin" />
+            <div className="w-12 h-12 border-4 border-slate-700 border-t-[var(--accent)] rounded-full animate-spin" />
             <p className="mt-4 font-mono text-sm">buffering... because of you specifically</p>
           </div>
         </PortalBox>
@@ -1745,9 +1763,9 @@ export default function OppositeExe() {
         <PortalBox>
           <div className="fixed inset-0 z-[150] bg-black/90 flex items-center justify-center p-6">
             <div className="max-w-lg font-mono w-full">
-              <p className="text-red-500 font-black mb-4">JUDGMENT DAY</p>
+              <p className="text-[var(--danger)] font-bold mb-4">JUDGMENT DAY</p>
               <p className="text-sm whitespace-pre-wrap">{judgmentText}<span className="animate-pulse">_</span></p>
-              <button onClick={() => setJudgment(false)} className="mt-6 bg-red-600 px-4 py-2 rounded font-bold text-sm">accept your grade</button>
+              <button onClick={() => setJudgment(false)} className="mt-6 bg-[var(--danger)] px-4 py-2 rounded font-bold text-sm">accept your grade</button>
             </div>
           </div>
         </PortalBox>
@@ -1786,7 +1804,7 @@ export default function OppositeExe() {
                   setToast("congrats. you agreed to nothing.");
                   setTimeout(() => setToast(null), 3000);
                 }}
-                className={cn("w-full px-4 py-3 rounded-xl font-black uppercase text-sm", termsAccept ? "bg-green-600" : "bg-zinc-700 opacity-50")}
+                className={cn("w-full px-4 py-3 rounded-[6px] font-bold uppercase text-sm", termsAccept ? "bg-[var(--accent)] text-black" : "bg-zinc-700 opacity-50")}
               >
                 {termsAccept ? "ok you clearly didn't read it. same." : "accept (keep scrolling)"}
               </button>
@@ -1811,11 +1829,11 @@ export default function OppositeExe() {
         <PortalBox>
           <div className="fixed bottom-4 left-4 z-[100] space-y-2 w-[90vw] max-w-xs">
             {banners.slice(-3).map((id) => (
-              <div key={id} className="bg-amber-100 text-black p-3 rounded-xl border-2 border-black text-xs shadow-lg">
+              <div key={id} className="bg-[var(--bg-1)] text-[var(--text-1)] p-3 rounded-[10px] border border-[var(--border-strong)] text-xs">
                 <p className="font-bold mb-2">{HYDRA_MSGS[Math.min(id, HYDRA_MSGS.length - 1)]}</p>
                 <div className="flex gap-2">
-                  <button onClick={acceptCookies} className="bg-black text-white px-3 py-1 rounded font-bold">accept</button>
-                  <button onClick={declineCookie} className="border border-black px-3 py-1 rounded font-bold">decline</button>
+                  <button onClick={acceptCookies} className="bg-[var(--accent)] text-[#0A0A0B] px-3 py-1 rounded-[6px] font-bold">accept</button>
+                  <button onClick={declineCookie} className="border border-[var(--border-strong)] px-3 py-1 rounded-[6px] font-bold">decline</button>
                 </div>
               </div>
             ))}
@@ -1824,12 +1842,12 @@ export default function OppositeExe() {
       )}
 
       <PortalBox>
-        <div className="fixed top-2 left-2 z-[50] font-mono text-xs bg-black/70 text-green-400 px-2 py-1 rounded">
+        <div className="fixed top-2 left-2 z-[50] font-mono text-xs bg-black/70 text-[var(--accent)] px-2 py-1 rounded">
           time wasted: {clock}
         </div>
       </PortalBox>
       <PortalBox>
-        <div className="fixed top-2 right-2 z-[50] font-mono text-xs bg-black text-yellow-400 px-2 py-1 rounded border border-yellow-400 max-w-[45vw] text-right">
+        <div className="fixed top-2 right-2 z-[50] font-mono text-[10px] bg-black text-[var(--text-2)] px-2 py-1 rounded border border-[var(--border-strong)] max-w-[38vw] md:max-w-[45vw] md:text-xs text-right">
           visitor #000001 — it&apos;s just you. it&apos;s always been just you.
         </div>
       </PortalBox>
@@ -1842,7 +1860,7 @@ export default function OppositeExe() {
                 initial={{ x: 100, opacity: 0 }}
                 animate={{ x: 0, opacity: 1 }}
                 exit={{ x: 100, opacity: 0 }}
-                className="bg-white text-black p-4 rounded-2xl shadow-2xl font-bold italic border-4 border-black"
+                 className="bg-[var(--bg-1)] text-[var(--text-1)] px-4 py-3 rounded-[10px] border border-[var(--border-strong)] font-bold italic"
               >
                 {toast}
               </motion.div>
@@ -1859,9 +1877,9 @@ export default function OppositeExe() {
                 initial={{ y: -100, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
                 exit={{ y: -100, opacity: 0 }}
-                className="bg-zinc-900 text-white px-4 py-3 rounded-xl shadow-2xl border-b-8 border-green-500"
+                 className="bg-zinc-900 text-white px-4 py-3 rounded-[10px] shadow-2xl border-b-2 border-[var(--accent)]"
               >
-                <p className="text-[10px] uppercase tracking-widest text-green-400 font-bold">achievement unlocked</p>
+                <p className="text-[10px] uppercase tracking-widest text-[var(--accent)] font-bold">achievement unlocked</p>
                 <p className="font-bold italic">{achieve.replace("achievement: ", "")}</p>
               </motion.div>
             )}
@@ -1874,31 +1892,35 @@ export default function OppositeExe() {
           {!chatOpen ? (
             <button
               onClick={() => setChatOpen(true)}
-              className="ml-auto block bg-green-600 text-white text-xs font-black uppercase px-4 py-2 rounded-full shadow-lg"
+              className="ml-auto bg-[var(--accent)] text-[#0A0A0B] text-xs font-bold uppercase px-5 py-2 rounded-[6px] min-h-[44px] inline-flex items-center"
             >
               victims' chat
             </button>
           ) : (
-            <div className={`bg-slate-800 rounded-2xl border-4 border-black shadow-xl overflow-hidden ${comic}`}>
-              <div className="bg-green-700 px-2 py-2 flex justify-between items-center gap-2">
-                <span className="text-xs font-black uppercase truncate min-w-0">victims' chat<span className="hidden min-[420px]:inline"> • {roomCount} here</span></span>
+            <div className={`chat-panel overflow-hidden ${comic}`}>
+              <div className="chat-bar">
+                <span className="chat-dot" /><span className="chat-dot" /><span className="chat-dot" />
+                <span className="chat-title">TRANSMISSIONS</span>
               {displayName !== "" && (
-                <div className="px-2 py-1 flex gap-1 items-center bg-slate-900 text-xs min-w-0">
+                <div className="px-2 py-1 flex gap-1 items-center bg-[var(--bg-0)] border border-[var(--border-subtle)] rounded-[6px] text-xs min-w-0 shrink-0">
                   {isCustom ? (
                     <><span className="truncate">you are <b>{displayName}</b></span><button onClick={resetName} className="underline shrink-0">reset</button></>
                   ) : (
-                    <><input value={nameInput} onChange={(e) => setNameInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { setName(nameInput); setNameInput(""); } }} placeholder="call yourself something" maxLength={30} className="flex-1 bg-slate-950 text-xs p-1 rounded outline-none min-w-0" /><button onClick={() => { setName(nameInput); setNameInput(""); }} className="font-bold shrink-0">set</button></>
+                    <><input value={nameInput} onChange={(e) => setNameInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { setName(nameInput); setNameInput(""); } }} placeholder="call yourself something" maxLength={30} className="w-24 bg-transparent text-xs p-1 outline-none" /><button onClick={() => { setName(nameInput); setNameInput(""); }} className="font-bold shrink-0">set</button></>
                   )}
                 </div>
               )}
+                {collapsed && unread > 0 && <span className="unread-badge">{unread} NEW</span>}
+                <button onClick={() => setCollapsedPersist(!collapsed)} aria-label="collapse chat" className="collapse-btn shrink-0">{collapsed ? "[+]" : "[—]"}</button>
                 <button onClick={() => setChatOpen(false)} aria-label="minimize chat" className="text-base font-black px-4 py-2 min-w-[44px] min-h-[44px] shrink-0 leading-none">_</button>
               </div>
+              <div className={`chat-fold${collapsed ? " folded" : ""}`}><div className="chat-fold-inner">
               <div data-modal-scroll className="h-48 overflow-y-auto p-2 space-y-2 text-xs">
                 {chatMsgs.map((m) => (
-                  <motion.div key={m.k} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className={cn("p-2 rounded-lg max-w-[90%]", m.me ? "ml-auto bg-blue-600 text-right" : "bg-slate-700")}>
-                    {!m.me && m.name !== "" && <p className="text-[10px] font-bold text-lime-400">{m.name}</p>}
+                  <motion.div key={m.k} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className={cn("p-2 rounded-lg max-w-[90%]", m.me ? "chat-bubble-me" : "chat-bubble-them")}>
+                    {!m.me && m.name !== "" && <p className={cn("chat-name", (m.name === displayName || !/ #\d$/.test(m.name || "")) ? "chat-name-pop" : "chat-name-dim")}>{m.name}</p>}
                     <p>{m.text}</p>
-                    {m.at ? <p className="text-[10px] opacity-60">{new Date(m.at).toLocaleTimeString()}</p> : null}
+                    {m.at ? <p className="text-[10px] opacity-60 text-right text-[var(--text-3)]">{new Date(m.at).toLocaleTimeString()}</p> : null}
                   </motion.div>
                 ))}
               </div>
@@ -1909,13 +1931,15 @@ export default function OppositeExe() {
                   onKeyDown={(e) => e.key === 'Enter' && sendChat()}
                   placeholder={chatPh}
                   maxLength={200}
-                  className="flex-1 bg-slate-900 text-xs p-2 rounded outline-none min-w-0"
+                  className="chat-input flex-1 min-w-0"
                 />
                 <button
                   onMouseEnter={() => { if (Math.random() < 0.1) { setChatPh("scream into the void"); setTimeout(() => setChatPh("ask anything..."), 3000); } }}
                   onClick={sendChat}
-                  className="bg-green-600 text-xs font-bold px-2 rounded"
+                  className="btn-send"
                 >send</button>
+              </div>
+              </div>
               </div>
             </div>
           )}
@@ -1923,49 +1947,49 @@ export default function OppositeExe() {
       )}
       </PortalBox>
 
-      <div className="relative z-10 p-4 md:p-12 max-w-5xl mx-auto text-slate-100 pt-12">
+      <div className="relative z-10 p-4 md:p-12 max-w-7xl mx-auto pt-12">
 
-        <header className="mb-16">
-          <nav className="flex items-center justify-between mb-10">
-            <button onClick={logoTap} className="font-display font-bold text-xl tracking-tight">opposite™</button>
-            <div className="flex gap-4 text-sm font-bold">
-              <button onClick={deadLink}>features</button>
-              <button onClick={deadLink}>pricing</button>
-              <button onClick={() => setExitOpen(true)} className="text-red-400">exit</button>
-            </div>
+        <header className="pt-40 pb-24">
+          <nav className="fixed top-0 left-0 right-0 h-14 z-[60] flex items-center justify-between px-4 md:px-8 border-b border-[var(--border-subtle)]" style={{ background: "rgba(10,10,11,0.9)", backdropFilter: "blur(12px)" }}>
+            <button onClick={logoTap} className="font-terminal font-bold text-xs tracking-wider whitespace-nowrap">OPPOSITE.EXE<span className="blink text-[var(--accent)]">▮</span></button>
+            <p className="mono-label text-[var(--text-2)] whitespace-nowrap"><span className="text-[var(--accent)] animate-pulse">●</span> {roomCount} ONLINE</p>
           </nav>
-          <div data-tilt className="text-center rounded-3xl bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-500 p-8 md:p-16 border-4 border-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] relative grain overflow-hidden">
-            <p className="text-xs font-bold uppercase tracking-[0.3em] mb-4 opacity-80">{"\u2728"} now with 47% more opposite {"\u2728"}</p>
-            <h1 className="font-display text-4xl md:text-7xl font-bold tracking-tight mb-4">productivity, <span className="glow-text">perfected.</span></h1>
-            <p className="text-sm md:text-lg opacity-90 mb-8">{heroSub}</p>
-            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+          <div data-tilt className="text-left">
+            <p className="mono-label text-[var(--accent)] mb-6">{"//"} THE WORLD&apos;S LEAST USEFUL PLATFORM</p>
+            <h1 className="t-display mb-6">Enterprise-grade <span className="text-[var(--accent)]">futility</span>, at scale.</h1>
+            <p className="t-body mb-10 max-w-[52ch]">{heroSub}</p>
+            <div className="flex flex-col sm:flex-row gap-3 justify-start">
               <button
                 onClick={() => {
                   setToast("just kidding. there's nothing to start.");
                   setTimeout(() => setToast(null), 3000);
                 }}
-                title="why would you do that" className="bg-white text-black px-6 py-3 rounded-xl font-black uppercase text-sm transition-transform duration-200 hover:-translate-x-1 hover:translate-y-[2px] btn-glow"
+                title="why would you do that" className="cta-primary"
               >
                 start free
               </button>
-              <button onClick={() => setChatOpen(true)} className="border-2 border-white px-6 py-3 rounded-xl font-bold text-sm">
+              <button onClick={() => setChatOpen(true)} className="cta-secondary">
                 talk to sales
               </button>
             </div>
           </div>
-          <p className="text-center font-mono text-xs text-lime-400 mt-4"><span className="font-black">{heroUsers.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",")}</span> users and counting. mostly counting down.</p>
-          <div className="mt-6 text-xl font-bold bg-yellow-400 text-black py-1 overflow-hidden whitespace-nowrap rounded-xl border-4 border-black">
+          <div className="mt-10 flex flex-wrap gap-8 md:gap-12">
+            <div><p className="stats-num">{heroUsers.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",")}</p><p className="mono-label text-[var(--text-3)] mt-1">users (mostly countdown)</p></div>
+            <div><p className="stats-num">3,482,901</p><p className="mono-label text-[var(--text-3)] mt-1">buttons clicked</p></div>
+            <div><p className="stats-num">0</p><p className="mono-label text-[var(--text-3)] mt-1">purposes served</p></div>
+          </div>
+          <div className="ticker mt-10">
             <div className="inline-block animate-marquee-scroll">
-              3,482,901 buttons clicked • 0 purposes served • 47-day vibes incident ongoing •&nbsp;
-              3,482,901 buttons clicked • 0 purposes served • 47-day vibes incident ongoing •&nbsp;
+              3,482,901 buttons clicked // 0 purposes served // 47-day vibes incident ongoing //&nbsp;
+              3,482,901 buttons clicked // 0 purposes served // 47-day vibes incident ongoing //&nbsp;
             </div>
           </div>
         </header>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
+        <div className="feature-grid grid grid-cols-1 md:grid-cols-3 gap-6">
 
-          <section style={gravStyle(0)} className="bg-slate-800 p-8 rounded-3xl border-4 border-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] transition-all duration-700">
-            <h2 className="text-2xl font-black mb-6 uppercase italic">sign up</h2>
+          <section style={gravStyle(0)} className="card p-8 transition-all duration-700">
+            <h2 className="t-h2 mb-6">sign up</h2>
             <div className="space-y-4">
               <div className="relative">
                 <input
@@ -1981,14 +2005,14 @@ export default function OppositeExe() {
                   )}
                   style={usernameAttempts >= 3 ? { left: usernamePos.x, top: usernamePos.y } : {}}
                 />
-                <p className="mt-2 text-sm text-red-400 font-bold italic">{usernameMsg}</p>
+                <p className="mt-2 text-sm text-[var(--danger)] font-bold italic">{usernameMsg}</p>
               </div>
               <button
                 onMouseEnter={handleRunawayBtnHover}
                 onTouchStart={handleRunawayTouch}
                 onClick={handleRunawayClick}
                 className={cn(
-                  "bg-blue-600 text-white px-8 py-4 rounded-lg font-black uppercase transition-all",
+                  "bg-[var(--accent)] text-[#0A0A0B] px-8 py-4 rounded-[6px] font-bold uppercase transition-all",
                   btnFixed ? "fixed z-50" : ""
                 )}
                 style={btnFixed ? { left: btnPos.x, top: btnPos.y } : {}}
@@ -1998,26 +2022,26 @@ export default function OppositeExe() {
             </div>
           </section>
 
-          <section style={gravStyle(1)} className="bg-slate-800 p-8 rounded-3xl border-4 border-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] space-y-8 transition-all duration-700">
-            <h2 className="text-2xl font-black mb-6 uppercase italic">controls</h2>
-            <div className="flex items-center justify-between p-4 bg-slate-900 rounded-xl">
+          <section style={gravStyle(1)} className="card p-8 space-y-8 transition-all duration-700">
+            <h2 className="t-h2 mb-6">controls</h2>
+            <div className="flex items-center justify-between p-4 bg-[var(--bg-1)] border border-[var(--border-subtle)] rounded-[10px]">
               <span className="font-bold">dark mode</span>
               <button onClick={() => setIsRainbow(!isRainbow)} className="w-12 h-6 bg-slate-700 rounded-full relative transition-colors">
                 <div className={cn("absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-all", isRainbow ? "left-7 bg-yellow-400" : "")} />
               </button>
             </div>
-            <div className="flex items-center justify-between p-4 bg-slate-900 rounded-xl">
+            <div className="flex items-center justify-between p-4 bg-[var(--bg-1)] border border-[var(--border-subtle)] rounded-[10px]">
               <span className="font-bold">mute</span>
-              <button onClick={playAirhorn} className="bg-red-600 px-4 py-1 rounded font-bold hover:bg-red-500 transition-colors">OFF</button>
+              <button onClick={playAirhorn} className="bg-[var(--danger)] text-[#0A0A0B] px-4 py-1 rounded-[6px] font-bold">OFF</button>
             </div>
             <div className="space-y-2">
               <span className="font-bold text-sm uppercase">Volume</span>
-              <input type="range" className="w-full accent-pink-500" onChange={(e) => setFontSize(parseInt(e.target.value))} min="8" max="100" />
+              <input type="range" className="w-full accent-[var(--accent)]" onChange={(e) => setFontSize(parseInt(e.target.value))} min="8" max="100" />
             </div>
           </section>
 
-          <section style={gravStyle(2)} className="bg-slate-800 p-8 rounded-3xl border-4 border-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] transition-all duration-700">
-            <h2 className="text-2xl font-black mb-6 uppercase italic">backwards thinking</h2>
+          <section style={gravStyle(2)} className="card p-8 transition-all duration-700">
+            <h2 className="t-h2 mb-6">backwards thinking</h2>
             <input
               type="text"
               value={backwardsVal.split('').reverse().join('')}
@@ -2025,44 +2049,44 @@ export default function OppositeExe() {
               placeholder="type something..."
               className="w-full bg-slate-100 text-black p-4 rounded-lg font-bold outline-none"
             />
-            <p className="mt-2 text-xs text-slate-400 italic">your thoughts are literally backwards</p>
+            <p className="mt-2 text-xs text-[var(--text-2)] italic">your thoughts are literally backwards</p>
           </section>
 
-          <section style={gravStyle(3)} className="bg-slate-800 p-8 rounded-3xl border-4 border-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] transition-all duration-700">
-            <h2 className="text-2xl font-black mb-6 uppercase italic">optimization</h2>
-            <div className="bg-slate-900 p-6 rounded-xl text-center space-y-4">
+          <section style={gravStyle(3)} className="card p-8 transition-all duration-700">
+            <h2 className="t-h2 mb-6">optimization</h2>
+            <div className="bg-[var(--bg-1)] border border-[var(--border-subtle)] rounded-[10px] p-6 text-center space-y-4">
               <p className="text-sm font-bold italic">{loadMsg}</p>
               <div className="w-full h-6 bg-slate-700 rounded-full overflow-hidden border-2 border-black">
-                <motion.div className="h-full bg-green-500" animate={{ width: `${progress}%` }} />
+                <motion.div className="h-full bg-[var(--accent)]" animate={{ width: `${progress}%` }} />
               </div>
               {!loading && (
-                <button onClick={startLoading} className="bg-green-600 text-white px-4 py-2 rounded font-bold uppercase text-xs">
+                <button onClick={startLoading} className="bg-[var(--accent)] text-[#0A0A0B] px-4 py-2 rounded-[6px] font-bold uppercase text-xs">
                   Start Optimization
                 </button>
               )}
             </div>
           </section>
-          <section style={gravStyle(4)} className="bg-slate-800 p-8 rounded-3xl border-4 border-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] transition-all duration-700">
-            <h2 className="text-2xl font-black mb-6 uppercase italic">verify you&apos;re human</h2>
+          <section style={gravStyle(4)} className="card p-8 transition-all duration-700">
+            <h2 className="t-h2 mb-6">verify you&apos;re human</h2>
             <button onClick={handleCaptcha} className="flex items-center gap-3 bg-slate-100 text-black p-4 rounded-lg font-bold w-full">
-              <span className={cn("w-6 h-6 border-4 border-black rounded flex items-center justify-center bg-white", captchaChecked && "bg-green-500")}>
+              <span className={cn("w-6 h-6 border-4 border-black rounded flex items-center justify-center bg-white", captchaChecked && "bg-[var(--accent)]")}>
                 {captchaChecked ? "\u2713" : ""}
               </span>
               i&apos;m not a robot
             </button>
-            <p className="mt-2 text-sm text-red-400 font-bold italic">{captchaMsg}</p>
+            <p className="mt-2 text-sm text-[var(--danger)] font-bold italic">{captchaMsg}</p>
           </section>
 
-          <section style={gravStyle(5)} className="bg-slate-800 p-8 rounded-3xl border-4 border-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] transition-all duration-700">
-            <h2 className="text-2xl font-black mb-6 uppercase italic">free antivirus</h2>
-            <div className="bg-slate-900 p-6 rounded-xl text-center space-y-4">
+          <section style={gravStyle(5)} className="card p-8 transition-all duration-700">
+            <h2 className="t-h2 mb-6">free antivirus</h2>
+            <div className="bg-[var(--bg-1)] border border-[var(--border-subtle)] rounded-[10px] p-6 text-center space-y-4">
               {!scanDone ? (
                 <>
                   <div className="w-full h-6 bg-slate-700 rounded-full overflow-hidden border-2 border-black">
-                    <motion.div className="h-full bg-red-500" animate={{ width: `${scanProgress}%` }} />
+                    <motion.div className="h-full bg-[var(--danger)]" animate={{ width: `${scanProgress}%` }} />
                   </div>
                   {!scanning && (
-                    <button onClick={startVirusScan} className="bg-red-600 text-white px-4 py-2 rounded font-bold uppercase text-xs">
+                    <button onClick={startVirusScan} className="bg-[var(--danger)] text-[#0A0A0B] px-4 py-2 rounded-[6px] font-bold uppercase text-xs">
                       scan my device
                     </button>
                   )}
@@ -2071,20 +2095,20 @@ export default function OppositeExe() {
               ) : (
                 <>
                   <p className="text-sm font-bold">3 threats found:</p>
-                  <ul className="text-xs font-mono text-red-400 space-y-1">
+                  <ul className="text-xs font-mono text-[var(--danger)] space-y-1">
                     {THREATS.map(t => <li key={t}>{t}</li>)}
                   </ul>
-                  <button onClick={handleFixNow} className="bg-red-600 text-white px-4 py-2 rounded font-bold uppercase text-xs">
+                  <button onClick={handleFixNow} className="bg-[var(--danger)] text-[#0A0A0B] px-4 py-2 rounded-[6px] font-bold uppercase text-xs">
                     fix now
                   </button>
-                  {fixMsg && <p className="text-xs font-bold italic text-yellow-400">{fixMsg}</p>}
+                  {fixMsg && <p className="text-xs font-bold italic text-[var(--text-2)]">{fixMsg}</p>}
                 </>
               )}
             </div>
           </section>
 
-          <section style={gravStyle(6)} className="bg-slate-800 p-8 rounded-3xl border-4 border-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] transition-all duration-700">
-            <h2 className="text-2xl font-black mb-6 uppercase italic">super secure password</h2>
+          <section style={gravStyle(6)} className="card p-8 transition-all duration-700">
+            <h2 className="t-h2 mb-6">super secure password</h2>
             <input
               type="password"
               value={pw}
@@ -2093,65 +2117,65 @@ export default function OppositeExe() {
               className="w-full bg-slate-100 text-black p-4 rounded-lg font-bold outline-none"
             />
             <div className="w-full h-3 bg-slate-700 rounded-full overflow-hidden mt-3">
-              <div className="h-full bg-gradient-to-r from-red-500 to-yellow-500 transition-all" style={{ width: `${Math.min(pw.length * 12, 100)}%` }} />
+              <div className="h-full bg-[var(--accent)] transition-all" style={{ width: `${Math.min(pw.length * 12, 100)}%` }} />
             </div>
-            <p className="mt-2 text-sm text-red-400 font-bold italic">{pwMsg}</p>
+            <p className="mt-2 text-sm text-[var(--danger)] font-bold italic">{pwMsg}</p>
           </section>
 
-          <section style={gravStyle(7)} className="bg-slate-800 p-8 rounded-3xl border-4 border-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] transition-all duration-700 text-center">
-            <h2 className="text-2xl font-black mb-6 uppercase italic">totally legit offer</h2>
+          <section style={gravStyle(7)} className="card p-8 transition-all duration-700">
+            <h2 className="t-h2 mb-6">totally legit offer</h2>
             <motion.button
               whileHover={{ scale: 1.05 }}
               onClick={handleVbucks}
-              className="bg-gradient-to-r from-purple-500 to-pink-500 text-white px-8 py-4 rounded-xl font-black uppercase animate-pulse"
+              className="bg-[var(--bg-2)] border border-[var(--border-strong)] text-[var(--text-1)] px-8 py-4 rounded-[6px] font-bold uppercase animate-pulse"
             >
               {"\u{1F381}"} free vbucks {"\u{1F381}"}
             </motion.button>
-            <p className="mt-3 text-xs text-slate-400 italic">no scam. trust.</p>
+            <p className="mt-3 text-xs text-[var(--text-2)] italic">no scam. trust.</p>
           </section>
 
-          <section style={gravStyle(8)} className="bg-slate-800 p-8 rounded-3xl border-4 border-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] transition-all duration-700 space-y-6">
+          <section style={gravStyle(8)} className="card p-8 transition-all duration-700 space-y-6">
             <h2 className="text-2xl font-black uppercase italic">downloads</h2>
-            <button onClick={downloadRam} className="w-full bg-cyan-600 text-white px-4 py-3 rounded-lg font-black uppercase text-sm">
+            <button onClick={downloadRam} className="w-full bg-[var(--accent)] text-[#0A0A0B] px-4 py-3 rounded-[6px] font-bold uppercase text-sm">
               download more ram (16gb, free)
             </button>
             <div>
-              <button onClick={handleHonest} className="w-full bg-zinc-600 text-white px-4 py-3 rounded-lg font-bold text-sm">
+              <button onClick={handleHonest} className="w-full bg-[var(--bg-2)] border border-[var(--border-strong)] text-[var(--text-1)] px-4 py-3 rounded-[6px] font-bold text-sm">
                 this button does nothing
               </button>
-              {honestMsg && <p className="mt-2 text-xs text-green-400 font-bold italic">{honestMsg}</p>}
+              {honestMsg && <p className="mt-2 text-xs text-[var(--accent)] font-bold italic">{honestMsg}</p>}
             </div>
           </section>
 
-          <section style={gravStyle(9)} className="bg-slate-800 p-8 rounded-3xl border-4 border-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] transition-all duration-700 space-y-4">
+          <section style={gravStyle(9)} className="card p-8 transition-all duration-700 space-y-4">
             <h2 className="text-2xl font-black uppercase italic">display nonsense</h2>
-            <div className="flex items-center justify-between p-4 bg-slate-900 rounded-xl">
+            <div className="flex items-center justify-between p-4 bg-[var(--bg-1)] border border-[var(--border-subtle)] rounded-[10px]">
               <span className="font-bold">gravity</span>
-              <button onClick={() => { setGravity(g => !g); setToast(gravity ? "gravity restored. coward." : "whoops."); setTimeout(() => setToast(null), 3000); }} className="bg-purple-600 px-4 py-1 rounded font-bold">
+              <button onClick={() => { setGravity(g => !g); setToast(gravity ? "gravity restored. coward." : "whoops."); setTimeout(() => setToast(null), 3000); }} className="bg-[var(--bg-2)] border border-[var(--border-strong)] px-4 py-1 rounded-[6px] font-bold">
                 {gravity ? "ON" : "OFF"}
               </button>
             </div>
-            <div className="flex items-center justify-between p-4 bg-slate-900 rounded-xl">
+            <div className="flex items-center justify-between p-4 bg-[var(--bg-1)] border border-[var(--border-subtle)] rounded-[10px]">
               <span className="font-bold">hd graphics</span>
-              <button onClick={() => setCrt(c => !c)} className="bg-amber-600 px-4 py-1 rounded font-bold">
+              <button onClick={() => setCrt(c => !c)} className="bg-[var(--bg-2)] border border-[var(--border-strong)] px-4 py-1 rounded-[6px] font-bold">
                 {crt ? "ON" : "OFF"}
               </button>
             </div>
-            <div className="flex items-center justify-between p-4 bg-slate-900 rounded-xl">
+            <div className="flex items-center justify-between p-4 bg-[var(--bg-1)] border border-[var(--border-subtle)] rounded-[10px]">
               <span className="font-bold">precision mode</span>
-              <button onClick={() => setPrecision(p => !p)} className="bg-lime-600 px-4 py-1 rounded font-bold">
+              <button onClick={() => setPrecision(p => !p)} className="bg-[var(--bg-2)] border border-[var(--border-strong)] px-4 py-1 rounded-[6px] font-bold">
                 {precision ? "ON" : "OFF"}
               </button>
             </div>
-            <div className="flex items-center justify-between p-4 bg-slate-900 rounded-xl">
+            <div className="flex items-center justify-between p-4 bg-[var(--bg-1)] border border-[var(--border-subtle)] rounded-[10px]">
               <span className="font-bold">matrix (wake up.)</span>
-              <button onClick={() => setMatrix(m => !m)} className="bg-green-700 px-4 py-1 rounded font-bold">
+              <button onClick={() => setMatrix(m => !m)} className="bg-[var(--bg-2)] border border-[var(--border-strong)] px-4 py-1 rounded-[6px] font-bold">
                 {matrix ? "ON" : "OFF"}
               </button>
             </div>
           </section>
 
-          <section style={gravStyle(10)} className="bg-slate-800 p-8 rounded-3xl border-4 border-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] transition-all duration-700">
+          <section style={gravStyle(10)} className="card p-8 transition-all duration-700">
             <h2 className="text-2xl font-black mb-4 uppercase italic">prove it again</h2>
             <p className="text-sm mb-3 font-bold">select all squares with a clown</p>
             <div className="grid grid-cols-3 gap-2">
@@ -2161,18 +2185,18 @@ export default function OppositeExe() {
                 </button>
               ))}
             </div>
-            <p className="mt-2 text-sm text-red-400 font-bold italic">{imgMsg}</p>
+            <p className="mt-2 text-sm text-[var(--danger)] font-bold italic">{imgMsg}</p>
           </section>
 
-          <section style={gravStyle(11)} className="bg-slate-800 p-8 rounded-3xl border-4 border-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] transition-all duration-700 space-y-3">
+          <section style={gravStyle(11)} className="card p-8 transition-all duration-700 space-y-3">
             <h2 className="text-2xl font-black uppercase italic">account stuff</h2>
-            <button onClick={startUpdate} className="w-full bg-indigo-600 text-white px-4 py-3 rounded-lg font-black uppercase text-sm">
+            <button onClick={startUpdate} className="w-full bg-[var(--accent)] text-[#0A0A0B] px-4 py-3 rounded-[6px] font-bold uppercase text-sm">
               check for updates
             </button>
-            <button onClick={() => { setTermsOpen(true); spy(codeNameRef.current + " opened the terms. bold strategy."); }} className="w-full bg-zinc-700 text-white px-4 py-3 rounded-lg font-bold text-sm">
+            <button onClick={() => { setTermsOpen(true); spy(codeNameRef.current + " opened the terms. bold strategy."); }} className="w-full bg-[var(--bg-2)] border border-[var(--border-strong)] text-[var(--text-1)] px-4 py-3 rounded-[6px] font-bold text-sm">
               read our terms (don&apos;t)
             </button>
-            <button onClick={shareSite} className="w-full bg-pink-600 text-white px-4 py-3 rounded-lg font-black uppercase text-sm">
+            <button onClick={shareSite} className="w-full bg-[var(--bg-2)] border border-[var(--border-strong)] text-[var(--text-1)] px-4 py-3 rounded-[6px] font-bold uppercase text-sm">
               share this site
             </button>
             {delStage === 0 && (
@@ -2190,7 +2214,7 @@ export default function OppositeExe() {
                       setTimeout(() => setToast(null), 3000);
                       setDelStage(0);
                     }}
-                    className="bg-green-600 text-2xl font-black px-8 py-4 rounded-xl uppercase"
+                    className="bg-[var(--accent)] text-[#0A0A0B] text-2xl font-bold px-8 py-4 rounded-[6px] uppercase"
                   >
                     NO
                   </button>
@@ -2208,51 +2232,66 @@ export default function OppositeExe() {
               </div>
             )}
             {delStage === 2 && (
-              <p className="text-sm font-bold italic text-green-400">account deleted. there was no account. there never was.</p>
+              <p className="text-sm font-bold italic text-[var(--accent)]">account deleted. there was no account. there never was.</p>
             )}
           </section>
 
-          <section className="col-span-1 md:col-span-2 bg-slate-800 p-8 rounded-3xl border-4 border-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]">
+          <section className="col-span-1 md:col-span-3">
             <Reveal>
-            <h2 className="text-2xl font-black mb-6 uppercase italic text-center">real reviews from real humans</h2>
+            <h2 className="t-h2 mb-6">real reviews from real humans</h2>
             <Testimonials notify={notifyToast} />
             </Reveal>
           </section>
 
-          <section className="col-span-1 md:col-span-2 bg-slate-800 p-8 rounded-3xl border-4 border-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]">
-            <h2 className="text-2xl font-black mb-6 uppercase italic text-center">system status (trust us)</h2>
+          <section className="col-span-1 md:col-span-3 card p-8">
+            <h2 className="t-h2 mb-6">system status (trust us)</h2>
             <div className="space-y-2 text-sm font-bold">
-              <div className="flex justify-between bg-slate-900 p-3 rounded-xl"><span>website</span><span className="text-green-400">operational-ish</span></div>
-              <div className="flex justify-between bg-slate-900 p-3 rounded-xl"><span>buttons</span><span className="text-green-400">operational*</span></div>
-              <div className="flex justify-between bg-slate-900 p-3 rounded-xl"><span>support chat</span><span className="text-green-400">operational (there is none)</span></div>
-              <div className="flex justify-between bg-slate-900 p-3 rounded-xl"><span>vibes</span><span className="text-amber-400">degraded</span></div>
-              <p className="text-xs italic text-slate-500">* buttons work. just not for you. incident #47 open for 47 days: the vibes remain degraded. we have stopped asking.</p>
+              <div className="flex justify-between bg-[var(--bg-1)] border border-[var(--border-subtle)] rounded-[10px] p-3"><span>website</span><span className="text-[var(--accent)]">operational-ish</span></div>
+              <div className="flex justify-between bg-[var(--bg-1)] border border-[var(--border-subtle)] rounded-[10px] p-3"><span>buttons</span><span className="text-[var(--accent)]">operational*</span></div>
+              <div className="flex justify-between bg-[var(--bg-1)] border border-[var(--border-subtle)] rounded-[10px] p-3"><span>support chat</span><span className="text-[var(--accent)]">operational (there is none)</span></div>
+              <div className="flex justify-between bg-[var(--bg-1)] border border-[var(--border-subtle)] rounded-[10px] p-3"><span>vibes</span><span className="text-[var(--text-2)]">degraded</span></div>
+              <p className="text-xs italic text-[var(--text-3)]">* buttons work. just not for you. incident #47 open for 47 days: the vibes remain degraded. we have stopped asking.</p>
             </div>
           </section>
-          <section className="bg-slate-800 p-8 rounded-3xl border-4 border-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] transition-all duration-700">
-            <h2 className="text-2xl font-black mb-6 uppercase italic">frequently avoided questions</h2>
+          <section className="card p-8 transition-all duration-700">
+            <h2 className="t-h2 mb-6">frequently avoided questions</h2>
             <Faq notify={notifyToast} />
           </section>
-          <section className="col-span-1 md:col-span-2 bg-slate-800 p-8 rounded-3xl border-4 border-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]">
+          <section className="col-span-1 md:col-span-3">
             <Reveal>
-            <h2 className="font-display text-2xl font-bold mb-6 uppercase text-center">pricing (everyone pays nothing)</h2>
+            <h2 className="t-h2 mb-6">pricing (everyone pays nothing)</h2>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="bg-slate-900 p-6 rounded-2xl text-center space-y-3 card-lift">
-                <p className="font-black uppercase">free</p>
+              <div className="tier p-6 space-y-3">
+                <p className="mono-label text-[var(--text-2)]">free</p>
                 <p className="font-display text-4xl font-bold">$0</p>
-                <p className="text-xs italic text-slate-400">nothing. exactly what it says.</p>
+                <p className="t-small italic">nothing. exactly what it says.</p>
+                <ul className="t-mono space-y-1">
+                  <li><span className="text-[var(--accent)]">✓</span> unlimited nothing</li>
+                  <li><span className="text-[var(--accent)]">✓</span> zero support</li>
+                  <li><span className="text-[var(--text-3)]">✗</span> features</li>
+                </ul>
                 <DodgeBuy label="buy free" notify={notifyToast} />
               </div>
-              <div className="bg-slate-900 p-6 rounded-2xl text-center space-y-3 border-2 border-lime-400 card-lift">
-                <div className="inline-block bg-lime-400 text-black text-[11px] font-black uppercase px-3 py-1 rounded-full mb-1">most useless</div><p className="font-black uppercase text-lime-400">pro {"\u2728"}</p>
+              <div className="tier tier-featured p-6 space-y-3">
+                <div className="tier-tag">most useless</div><p className="mono-label text-[var(--accent)]">pro {"\u2728"}</p>
                 <p className="font-display text-4xl font-bold">$0/mo</p>
-                <p className="text-xs italic text-slate-400">nothing, but shinier.</p>
+                <p className="t-small italic">nothing, but shinier.</p>
+                <ul className="t-mono space-y-1">
+                  <li><span className="text-[var(--accent)]">✓</span> everything in free</li>
+                  <li><span className="text-[var(--accent)]">✓</span> shinier nothing</li>
+                  <li><span className="text-[var(--text-3)]">✗</span> usefulness</li>
+                </ul>
                 <DodgeBuy label="buy pro" notify={notifyToast} />
               </div>
-              <div className="bg-slate-900 p-6 rounded-2xl text-center space-y-3 card-lift">
-                <p className="font-black uppercase">enterprise</p>
+              <div className="tier p-6 space-y-3">
+                <p className="mono-label text-[var(--text-2)]">enterprise</p>
                 <p className="font-display text-4xl font-bold">call us</p>
-                <p className="text-xs italic text-slate-400">we won&apos;t answer.</p>
+                <p className="t-small italic">we won&apos;t answer.</p>
+                <ul className="t-mono space-y-1">
+                  <li><span className="text-[var(--accent)]">✓</span> a sales call</li>
+                  <li><span className="text-[var(--text-3)]">✗</span> answers</li>
+                  <li><span className="text-[var(--text-3)]">✗</span> refunds</li>
+                </ul>
                 <DodgeBuy label="call us" notify={notifyToast} />
               </div>
             </div>
@@ -2277,27 +2316,57 @@ export default function OppositeExe() {
             notify={notifyJudged}
             speak={sayLoud}
           />
-          <section className="col-span-1 md:col-span-2 bg-slate-800 p-8 rounded-3xl border-4 border-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] space-y-6">
+          <section className="col-span-1 md:col-span-3 pt-4">
             <Reveal>
-            <h2 className="text-2xl font-black uppercase italic text-center">never miss a disaster</h2>
+            <h2 className="t-h2">never miss a disaster</h2>
             <div className="flex flex-col sm:flex-row gap-2">
               <input value={nlEmail} onChange={(e) => setNlEmail(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") subscribeNl(); }} placeholder="your@email.com (mistake)" className="flex-1 bg-slate-100 text-black p-3 rounded-lg font-bold outline-none min-w-0" />
-              <button onClick={subscribeNl} className="bg-pink-600 px-6 py-3 rounded-lg font-black uppercase text-sm">subscribe</button>
+              <button onClick={subscribeNl} className="bg-[var(--accent)] text-[#0A0A0B] px-6 py-3 rounded-[6px] font-bold uppercase text-sm">subscribe</button>
             </div>
             <div className="text-center">
               <button onMouseEnter={dodgeUnsub} onTouchStart={dodgeUnsub} onClick={() => { setToast("unsubscribe failed. there is no off the list."); setTimeout(() => setToast(null), 3000); }} className="text-xs underline opacity-60" style={unsubFixed ? { position: "fixed", left: unsubPos.x, top: unsubPos.y, zIndex: 60 } : {}}>unsubscribe</button>
             </div>
-            <div className="flex flex-wrap gap-4 justify-center text-xs pt-4 border-t border-slate-700">
-              <button onClick={() => setLegalMsg("you actually clicked this. wow.")} className="underline opacity-60">privacy</button>
-              <button onClick={() => setLegalMsg("you actually clicked this. wow.")} className="underline opacity-60">terms</button>
-              <button onClick={() => setLegalMsg("you actually clicked this. wow.")} className="underline opacity-60">cookies</button>
-              <a href="https://www.youtube.com/watch?v=dQw4w9WgXcQ" target="_blank" rel="noreferrer" className="underline opacity-60">contact (definitely safe)</a>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-6 pt-6 border-t border-[var(--border-subtle)]">
+              <div>
+                <p className="mono-label text-[var(--text-3)] mb-3">product</p>
+                <div className="flex flex-col gap-2 items-start">
+                  <button onClick={deadLink} className="mono-label text-[var(--text-2)]">features</button>
+                  <button onClick={deadLink} className="mono-label text-[var(--text-2)]">pricing</button>
+                  <button onClick={() => setExitOpen(true)} className="mono-label text-[var(--text-2)]">exit (no)</button>
+                </div>
+              </div>
+              <div>
+                <p className="mono-label text-[var(--text-3)] mb-3">legal</p>
+                <div className="flex flex-col gap-2 items-start">
+                  <button onClick={() => setLegalMsg("you actually clicked this. wow.")} className="mono-label text-[var(--text-2)]">privacy</button>
+                  <button onClick={() => setLegalMsg("you actually clicked this. wow.")} className="mono-label text-[var(--text-2)]">terms</button>
+                  <button onClick={() => setLegalMsg("you actually clicked this. wow.")} className="mono-label text-[var(--text-2)]">cookies</button>
+                </div>
+              </div>
+              <div>
+                <p className="mono-label text-[var(--text-3)] mb-3">socials</p>
+                <div className="flex flex-col gap-2 items-start">
+                  <button onClick={deadLink} className="mono-label text-[var(--text-2)]">x</button>
+                  <button onClick={deadLink} className="mono-label text-[var(--text-2)]">instagram</button>
+                  <button onClick={deadLink} className="mono-label text-[var(--text-2)]">facebook</button>
+                </div>
+              </div>
+              <div>
+                <p className="mono-label text-[var(--text-3)] mb-3">contact</p>
+                <div className="flex flex-col gap-2 items-start">
+                  <a href="https://www.youtube.com/watch?v=dQw4w9WgXcQ" target="_blank" rel="noreferrer" className="mono-label text-[var(--text-2)]">contact (definitely safe)</a>
+                </div>
+              </div>
             </div>
+            <div className="overflow-hidden mt-10">
+              <p className="giant-mark">OPPOSITE</p>
+            </div>
+            <p className="t-mono text-[var(--text-3)] mt-4">© 2026 OPPOSITE INDUSTRIES — VENTURE-BACKED, VISION-FREE</p>
             </Reveal>
           </section>
           {legalMsg && (
             <Modal comic={comic}>
-              <div className="bg-slate-800 rounded-2xl border-4 border-black p-6 text-center">
+                <div className="bg-[var(--bg-1)] rounded-[10px] border border-[var(--border-strong)] p-6 text-center">
                 <p className="font-bold italic">{legalMsg}</p>
                 <button onClick={() => setLegalMsg(null)} className="mt-4 bg-slate-600 px-4 py-2 rounded font-bold text-sm">close (rude)</button>
               </div>
@@ -2310,21 +2379,21 @@ export default function OppositeExe() {
               whileTap={{ scale: 0.9 }}
               data-no-flee
               onClick={handleRedButton}
-              className="w-48 h-48 bg-red-600 rounded-full border-8 border-red-800 shadow-[0_20px_0_0_rgba(153,27,27,1)] active:shadow-none active:translate-y-4 transition-all flex items-center justify-center group"
+              className="w-48 h-48 bg-[var(--danger)] rounded-full border-8 border-red-800 shadow-[0_20px_0_0_rgba(153,27,27,1)] active:shadow-none active:translate-y-4 transition-all flex items-center justify-center group"
             >
               <span className="text-white font-black text-2xl group-hover:scale-110 transition-transform">PRESS ME</span>
             </motion.button>
-            <p className="mt-12 text-xs text-red-400 italic font-mono">serious warning: pressing this might cause extreme confusion</p>
-            {godMode && <p className="mt-4 font-black text-yellow-400 animate-pulse">GOD MODE ENGAGED</p>}
+            <p className="mt-12 text-xs text-[var(--danger)] italic font-mono">serious warning: pressing this might cause extreme confusion</p>
+            {godMode && <p className="mt-4 font-bold text-[var(--accent)] animate-pulse">GOD MODE ENGAGED</p>}
           </section>
           <section className="col-span-1 flex flex-col items-center justify-center p-8 bg-slate-800 rounded-3xl border-4 border-black space-y-4">
-            <h2 className="text-xl font-black uppercase italic">almost free money</h2>
-            <p className="text-xs text-slate-400 italic">hold to confirm. definitely works.</p>
+            <h2 className="t-h2">almost free money</h2>
+            <p className="text-xs text-[var(--text-2)] italic">hold to confirm. definitely works.</p>
             <div className="w-full bg-slate-900 rounded-full h-6 overflow-hidden border-2 border-black">
-              <div className="h-full bg-lime-400 transition-all" style={{ width: Math.min(100, holdPct) + "%" }} />
+              <div className="h-full bg-[var(--accent)] transition-all" style={{ width: Math.min(100, holdPct) + "%" }} />
             </div>
-            <p className="font-mono font-bold text-lime-400">{Math.floor(Math.min(99, holdPct))}%</p>
-            <button id="hold99" onPointerDown={holdStart} onPointerUp={holdStop} onPointerLeave={holdStop} onContextMenu={(e) => e.preventDefault()} className="bg-lime-400 text-black px-8 py-4 rounded-xl font-black uppercase select-none touch-none">hold to confirm</button>
+            <p className="font-mono font-bold text-[var(--accent)]">{Math.floor(Math.min(99, holdPct))}%</p>
+            <button id="hold99" onPointerDown={holdStart} onPointerUp={holdStop} onPointerLeave={holdStop} onContextMenu={(e) => e.preventDefault()} className="bg-[var(--accent)] text-[#0A0A0B] px-8 py-4 rounded-[6px] font-bold uppercase select-none touch-none">hold to confirm</button>
           </section>
 
         </div>
